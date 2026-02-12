@@ -84,6 +84,25 @@ export interface EventMessage extends BaseMessage {
 
 export type LiveMessage = SnapshotMessage | DeltaMessage | EventMessage;
 
+// Node Engine Specs
+export interface NodeGraphSpec {
+  nodes: any[];
+  edges: any[];
+}
+
+// Mapping Specs
+export interface MappingRule {
+  fromPath: string;
+  toKeyId: KeyId;
+  transforms?: string[];
+}
+
+export interface MappingSpec {
+  mappingId: string;
+  outputDictionaryId: string;
+  rules: MappingRule[];
+}
+
 // Studio Bindings
 export interface DataBinding {
   bindingId: string;
@@ -92,4 +111,15 @@ export interface DataBinding {
   keyId: KeyId;
   transforms: string[];
   fallback?: any;
+}
+
+// ITEM 03: Snapshot Bundle V1
+export interface SnapshotBundleV1 {
+  bundleVersion: "1.0.0";
+  exportedAt: number;
+  orgId: string;
+  dictionaries: Dictionary[];
+  mappings: MappingSpec[];
+  graphs: NodeGraphSpec[];
+  sampleSnapshot?: SnapshotMessage;
 }

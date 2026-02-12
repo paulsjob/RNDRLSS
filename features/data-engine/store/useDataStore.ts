@@ -13,10 +13,12 @@ import {
   applyNodeChanges, 
   addEdge 
 } from 'reactflow';
-import { DataAdapter, DictionaryItem } from '../../../shared/types';
+import { DataAdapter } from '../../../shared/types';
+import { Dictionary, MappingSpec } from '../../../contract/types';
 import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
+import { MLB_CANON_DICTIONARY } from '../../../contract/dictionaries/mlb';
 
 const ADAPTERS: DataAdapter[] = [
   new SportsAdapter(),
@@ -24,12 +26,23 @@ const ADAPTERS: DataAdapter[] = [
   new WeatherAdapter()
 ];
 
-// Fix: Added React Flow specific state and handlers to DataState interface to satisfy NodeCanvas.tsx destructuring
+interface ImportResult {
+  importedCount: number;
+  skippedCount: number;
+  conflicts: string[];
+}
+
 interface DataState {
+  orgId: string;
   availableAdapters: DataAdapter[];
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
-  dictionary: DictionaryItem[];
+  
+  // Dictionaries
+  builtinDictionaries: Dictionary[];
+  importedDictionaries: Dictionary[];
+  mappings: MappingSpec[];
+  
   isLoading: boolean;
   
   // React Flow State
@@ -41,47 +54,56 @@ interface DataState {
   addNode: (node: Node) => void;
 
   // Actions
+  setOrgId: (id: string) => void;
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
+  
+  // Persistence
+  saveToOrg: () => void;
+  loadFromOrg: (id: string) => void;
+  importBundleData: (data: { dictionaries: Dictionary[], mappings: MappingSpec[], graphs: any[] }) => ImportResult;
 }
 
 export const useDataStore = create<DataState>((set, get) => ({
+  orgId: 'org_default',
   availableAdapters: ADAPTERS,
   activeAdapterId: ADAPTERS[0].id,
   liveSnapshot: {},
-  dictionary: ADAPTERS[0].getDictionary(),
+  
+  builtinDictionaries: [MLB_CANON_DICTIONARY as unknown as Dictionary],
+  importedDictionaries: [],
+  mappings: [],
+  
   isLoading: false,
-
-  // Fix: Initialize nodes and edges arrays and implement state management logic for React Flow
   nodes: [],
   edges: [],
 
   onNodesChange: (changes: NodeChange[]) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
+    set({ nodes: applyNodeChanges(changes, get().nodes) });
+    get().saveToOrg();
   },
   onEdgesChange: (changes: EdgeChange[]) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
+    set({ edges: applyEdgeChanges(changes, get().edges) });
+    get().saveToOrg();
   },
   onConnect: (connection: Connection) => {
-    set({
-      edges: addEdge(connection, get().edges),
-    });
+    set({ edges: addEdge(connection, get().edges) });
+    get().saveToOrg();
   },
   addNode: (node: Node) => {
-    set({
-      nodes: [...get().nodes, node]
-    });
+    set({ nodes: [...get().nodes, node] });
+    get().saveToOrg();
+  },
+
+  setOrgId: (id) => {
+    set({ orgId: id });
+    get().loadFromOrg(id);
   },
 
   setActiveAdapter: async (id) => {
     const adapter = ADAPTERS.find(a => a.id === id);
     if (!adapter) return;
-    
-    set({ activeAdapterId: id, isLoading: true, dictionary: adapter.getDictionary() });
+    set({ activeAdapterId: id, isLoading: true });
     const snapshot = await adapter.fetchLive();
     set({ liveSnapshot: snapshot, isLoading: false });
   },
@@ -90,8 +112,84 @@ export const useDataStore = create<DataState>((set, get) => ({
     const { activeAdapterId } = get();
     const adapter = ADAPTERS.find(a => a.id === activeAdapterId);
     if (!adapter) return;
-    
     const snapshot = await adapter.fetchLive();
     set({ liveSnapshot: snapshot });
+  },
+
+  saveToOrg: () => {
+    const { orgId, importedDictionaries, mappings, nodes, edges } = get();
+    localStorage.setItem(`renderless:${orgId}:dataEngine:dictionaries`, JSON.stringify(importedDictionaries));
+    localStorage.setItem(`renderless:${orgId}:dataEngine:mappings`, JSON.stringify(mappings));
+    localStorage.setItem(`renderless:${orgId}:dataEngine:graphs`, JSON.stringify({ nodes, edges }));
+  },
+
+  loadFromOrg: (id) => {
+    const dictsRaw = localStorage.getItem(`renderless:${id}:dataEngine:dictionaries`);
+    const mapsRaw = localStorage.getItem(`renderless:${id}:dataEngine:mappings`);
+    const graphsRaw = localStorage.getItem(`renderless:${id}:dataEngine:graphs`);
+
+    set({
+      importedDictionaries: dictsRaw ? JSON.parse(dictsRaw) : [],
+      mappings: mapsRaw ? JSON.parse(mapsRaw) : [],
+      nodes: graphsRaw ? JSON.parse(graphsRaw).nodes || [] : [],
+      edges: graphsRaw ? JSON.parse(graphsRaw).edges || [] : []
+    });
+  },
+
+  importBundleData: ({ dictionaries, mappings, graphs }) => {
+    const { importedDictionaries: currentDicts, mappings: currentMaps } = get();
+    
+    let importedCount = 0;
+    let skippedCount = 0;
+    const conflicts: string[] = [];
+
+    // Import Dictionaries
+    const nextDicts = [...currentDicts];
+    dictionaries.forEach(dict => {
+      // Skip builtin
+      if (get().builtinDictionaries.some(bd => bd.dictionaryId === dict.dictionaryId)) {
+        skippedCount++;
+        conflicts.push(`Dictionary [Built-in]: ${dict.dictionaryId}`);
+        return;
+      }
+
+      const existingIdx = nextDicts.findIndex(d => d.dictionaryId === dict.dictionaryId && d.version === dict.version);
+      if (existingIdx === -1) {
+        nextDicts.push(dict);
+        importedCount++;
+      } else {
+        skippedCount++;
+        conflicts.push(`Dictionary [Exists]: ${dict.dictionaryId} v${dict.version}`);
+      }
+    });
+
+    // Import Mappings
+    const nextMaps = [...currentMaps];
+    mappings.forEach(map => {
+      const existingIdx = nextMaps.findIndex(m => m.mappingId === map.mappingId);
+      if (existingIdx === -1) {
+        nextMaps.push(map);
+        importedCount++;
+      } else {
+        skippedCount++;
+        conflicts.push(`Mapping [Exists]: ${map.mappingId}`);
+      }
+    });
+
+    set({ 
+      importedDictionaries: nextDicts,
+      mappings: nextMaps,
+      nodes: graphs[0]?.nodes || get().nodes,
+      edges: graphs[0]?.edges || get().edges
+    });
+
+    get().saveToOrg();
+    
+    return { importedCount, skippedCount, conflicts };
   }
 }));
+
+// Initial load
+setTimeout(() => {
+  useDataStore.getState().loadFromOrg('org_default');
+}, 0);

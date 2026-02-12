@@ -64,11 +64,29 @@ export const LiveMessageSchema = z.discriminatedUnion('type', [
   EventMessageSchema,
 ]);
 
-export const BindingSchema = z.object({
-  bindingId: z.string(),
-  layerId: z.string(),
-  targetPath: z.string(),
-  keyId: KeyIdSchema,
-  transforms: z.array(z.string()),
-  fallback: z.any().optional(),
+export const NodeGraphSpecSchema = z.object({
+  nodes: z.array(z.any()),
+  edges: z.array(z.any()),
+});
+
+export const MappingRuleSchema = z.object({
+  fromPath: z.string(),
+  toKeyId: KeyIdSchema,
+  transforms: z.array(z.string()).optional(),
+});
+
+export const MappingSpecSchema = z.object({
+  mappingId: z.string(),
+  outputDictionaryId: z.string(),
+  rules: z.array(MappingRuleSchema),
+});
+
+export const SnapshotBundleV1Schema = z.object({
+  bundleVersion: z.literal("1.0.0"),
+  exportedAt: z.number(),
+  orgId: z.string(),
+  dictionaries: z.array(DictionarySchema),
+  mappings: z.array(MappingSpecSchema),
+  graphs: z.array(NodeGraphSpecSchema),
+  sampleSnapshot: SnapshotMessageSchema.optional(),
 });
