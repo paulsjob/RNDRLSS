@@ -1,4 +1,5 @@
-import React, { ErrorInfo, ReactNode } from 'react';
+
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children?: ReactNode;
@@ -10,8 +11,11 @@ interface State {
   error: Error | null;
 }
 
-// Fixed: Extending React.Component explicitly to ensure TypeScript correctly resolves the base class members (props, setState, etc.).
-export class ErrorBoundary extends React.Component<Props, State> {
+/**
+ * Component to catch and handle runtime errors in the UI tree.
+ * Extends Component directly to ensure TypeScript resolves props and setState correctly.
+ */
+export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -23,7 +27,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   // Handle errors by logging them to the console and updating the internal error state.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Accessing props from the inherited React.Component base class.
+    // Accessing props from the inherited Component base class.
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
@@ -32,7 +36,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   // Reset the error state to allow the application to attempt a recovery render.
   private handleReset = () => {
-    // Calling setState from the inherited React.Component base class.
+    // Calling setState from the inherited Component base class.
     this.setState({ hasError: false, error: null });
   };
 
@@ -45,7 +49,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           </div>
           <h2 className="text-xl font-bold text-zinc-100 mb-2">Feature Unavailable</h2>
           <p className="text-sm text-zinc-500 text-center max-w-md mb-8">
-            {/* Accessing props.featureName from the React.Component base class. */}
+            {/* Accessing props.featureName from the inherited Component base class. */}
             The <span className="text-zinc-300 font-mono">{this.props.featureName || 'requested feature'}</span> encountered a critical error and had to be suspended.
           </p>
           <div className="bg-black/50 border border-zinc-800 rounded-lg p-4 w-full max-w-xl mb-8 overflow-hidden">
@@ -63,7 +67,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Accessing props.children from the React.Component base class.
+    // Accessing props.children from the inherited Component base class.
     return this.props.children;
   }
 }

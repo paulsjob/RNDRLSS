@@ -57,10 +57,10 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
         <div className="relative flex-1">
           <input 
             type="text" 
-            placeholder="Search all dictionaries..." 
+            placeholder="Search keys..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-200 focus:border-blue-500 outline-none pr-8 placeholder:text-zinc-700"
+            className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-200 focus:border-blue-500 outline-none pr-8 placeholder:text-zinc-700 font-medium"
           />
           <div className="absolute right-3 top-2.5 text-zinc-600">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -69,9 +69,9 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
         <select 
           value={selectedDictId}
           onChange={(e) => setSelectedDictId(e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[10px] text-zinc-400 font-bold outline-none focus:border-blue-500 max-w-[100px]"
+          className="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-[10px] text-zinc-400 font-bold outline-none focus:border-blue-500 max-w-[120px] cursor-pointer hover:border-zinc-700 transition-colors"
         >
-          <option value="all">All Sources</option>
+          <option value="all">All Dictionaries</option>
           {dictionaries.map(d => (
             <option key={d.dictionaryId} value={d.dictionaryId}>{d.dictionaryId.split('.').slice(-1)[0]}</option>
           ))}
@@ -84,40 +84,47 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
             <button
               key={`${k.dictId}-${k.keyId}`}
               onClick={() => onSelect(k.keyId)}
-              className={`w-full text-left px-3 py-2 hover:bg-zinc-800 flex flex-col transition-colors border-l-2 ${selectedKeyId === k.keyId ? 'border-blue-500 bg-blue-500/5' : 'border-transparent'}`}
+              className={`w-full text-left px-3 py-2.5 hover:bg-zinc-800 flex flex-col transition-all border-l-2 relative overflow-hidden group ${selectedKeyId === k.keyId ? 'border-blue-500 bg-blue-500/5' : 'border-transparent'}`}
             >
-              <div className="flex justify-between items-center">
-                <span className={`text-[11px] font-bold ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300'}`}>
+              <div className="flex justify-between items-center z-10">
+                <span className={`text-[11px] font-bold tracking-tight ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
                   {k.alias}
                 </span>
-                <span className={`text-[8px] px-1 py-0.5 rounded font-black uppercase tracking-tighter ${k.isBuiltin ? 'bg-blue-900/30 text-blue-500' : 'bg-zinc-800 text-zinc-500'}`}>
+                <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter shadow-sm ${k.isBuiltin ? 'bg-blue-900/40 text-blue-500 border border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
                   {k.dictName}
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex items-center gap-2 mt-1 z-10">
                 <span className="text-[9px] text-zinc-600 font-mono truncate">{k.path}</span>
                 {k.tags?.slice(0, 1).map(t => (
-                  <span key={t} className="text-[7px] text-zinc-700 uppercase">#{t}</span>
+                  <span key={t} className="text-[7px] text-zinc-700 uppercase font-black">#{t}</span>
                 ))}
               </div>
+              {selectedKeyId === k.keyId && (
+                <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+              )}
             </button>
           ))
         ) : (
-          <div className="p-4 text-center text-[10px] text-zinc-600 italic">No keys found</div>
+          <div className="p-8 text-center flex flex-col items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-800"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <p className="text-[10px] text-zinc-600 italic font-medium">No matching keys found in selected scope</p>
+          </div>
         )}
       </div>
 
       {selectedKey && (
-        <div className="p-2 bg-blue-500/5 border border-blue-500/20 rounded-lg flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-[8px] text-blue-500/60 uppercase font-black tracking-widest">Active Connection</span>
-            <span className="text-[10px] text-blue-400 font-bold">{selectedKey.alias}</span>
+        <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl flex items-center justify-between animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[8px] text-blue-500/80 uppercase font-black tracking-widest leading-none">Active Connection</span>
+            <span className="text-[11px] text-blue-400 font-black tracking-tight">{selectedKey.alias}</span>
           </div>
           <button 
             onClick={() => onSelect("")}
-            className="p-1.5 hover:bg-red-500/10 rounded-md text-zinc-600 hover:text-red-400 transition-all"
+            className="p-1.5 hover:bg-red-500/10 rounded-lg text-zinc-600 hover:text-red-400 transition-all group"
+            title="Disconnect"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-90 transition-transform"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
       )}
