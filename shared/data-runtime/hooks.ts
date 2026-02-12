@@ -31,3 +31,15 @@ export const useLiveValues = (keyIds: KeyId[]): Record<KeyId, LiveValueRecord | 
     () => ({})
   );
 };
+
+/**
+ * Subscribes to the entire bus version state.
+ * Useful for top-level monitors that need to react to any change.
+ */
+export const useLiveAll = () => {
+  return useSyncExternalStore(
+    liveBus.subscribe,
+    () => liveBus.getVersion(),
+    () => 0
+  );
+};
