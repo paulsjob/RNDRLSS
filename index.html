@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renderless Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React Flow Styles -->
+    <link rel="stylesheet" href="https://esm.sh/reactflow/dist/style.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "zustand": "https://esm.sh/zustand@^5.0.11",
+    "reactflow": "https://esm.sh/reactflow@^11.11.4",
+    "zod": "https://esm.sh/zod@3.23.8"
+  }
+}
+</script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 overflow-hidden">
+    <div id="root"></div>
+    <!-- Entry Point -->
+    <script type="module" src="index.tsx"></script>
+</body>
+</html>
