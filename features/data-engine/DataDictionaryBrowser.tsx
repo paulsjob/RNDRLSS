@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from './store/useDataStore';
 import { resolvePath, normalizeValue } from './engine-logic';
@@ -60,7 +59,8 @@ export const DataDictionaryBrowser: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-zinc-800">
-        {Object.entries(groupedDictionary).map(([category, items]) => (
+        {/* Fixed: Cast Object.entries to correct type to ensure 'items' is DictionaryItem[] and supports .map() */}
+        {(Object.entries(groupedDictionary) as [string, DictionaryItem[]][]).map(([category, items]) => (
           <div key={category} className="mb-4">
             <div className="flex items-center gap-2 px-2 py-1 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600"><path d="m6 9 6 6 6-6"/></svg>
@@ -68,7 +68,7 @@ export const DataDictionaryBrowser: React.FC = () => {
             </div>
             
             <div className="space-y-0.5 ml-2">
-              {/* Fixed: Ensure items is recognized as DictionaryItem[] to allow mapping */}
+              {/* items is now correctly typed as DictionaryItem[] */}
               {items.map((item: DictionaryItem) => {
                 const liveValue = resolvePath(liveSnapshot, item.providerPath);
                 const displayValue = normalizeValue(liveValue, item.dataType);

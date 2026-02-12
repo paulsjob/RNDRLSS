@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { StudioShell } from './features/studio';
 import { GameControl } from './features/game-control';
 import { LivePreview } from './features/output';
-import { NodeCanvas, DataDictionaryBrowser } from './features/data-engine';
+import { DataEngineView } from './features/data-engine/DataEngineView';
 import { ErrorBoundary } from './shared/components/ErrorBoundary';
 
 const App: React.FC = () => {
@@ -58,17 +58,12 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content area with diagnostic border (temporarily applied as per request) */}
+      {/* Main content area */}
       <main className="flex-1 overflow-hidden relative border-4 border-red-600/10">
         <ErrorBoundary key={`boundary-${activeTab}`} featureName={activeTab.toUpperCase()}>
           {activeTab === 'studio' && <StudioShell />}
           {activeTab === 'control' && <GameControl />}
-          {activeTab === 'data' && (
-            <div className="flex h-full overflow-hidden">
-              <DataDictionaryBrowser />
-              <NodeCanvas />
-            </div>
-          )}
+          {activeTab === 'data' && <DataEngineView />}
           {activeTab === 'output' && <LivePreview />}
         </ErrorBoundary>
       </main>

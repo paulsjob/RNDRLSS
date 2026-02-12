@@ -8,6 +8,7 @@ import {
   LogicLayer, 
   RESOLUTIONS 
 } from '../../../shared/types';
+import { MLB_KEYS } from '../../../contract/dictionaries/mlb';
 
 interface StudioState {
   // Template Data
@@ -45,8 +46,8 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
   id: 'tmpl-001',
   version: '1.0.0',
   metadata: {
-    name: 'NFL Game Scorebug',
-    tags: ['nfl', 'scorebug', 'live'],
+    name: 'MLB Live Scorebug',
+    tags: ['mlb', 'scorebug', 'live'],
     baseResolution: 'BROADCAST',
     logicLayer: LogicLayer.BUG
   },
@@ -68,17 +69,34 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
       locked: false,
       transform: { x: 60, y: 55, width: 100, height: 30, opacity: 1, rotation: 0 },
       content: { 
-        text: 'SEA', 
+        text: 'LAD', 
         fontSize: 24, 
         fontWeight: 'bold', 
         color: '#ffffff', 
         fontFamily: 'Inter',
         textAlign: 'center' 
       }
+    },
+    {
+      id: 'layer-home-score',
+      type: LayerType.TEXT,
+      name: 'Home Score',
+      visible: true,
+      locked: false,
+      transform: { x: 170, y: 55, width: 40, height: 30, opacity: 1, rotation: 0 },
+      content: { 
+        text: '0', 
+        fontSize: 24, 
+        fontWeight: 'black', 
+        color: '#3b82f6', 
+        fontFamily: 'Inter',
+        textAlign: 'center' 
+      }
     }
   ],
   bindings: {
-    'layer-home-team.text': 'dict-sea-abbr'
+    'layer-home-team.text': MLB_KEYS.TEAM_HOME_ABBR,
+    'layer-home-score.text': MLB_KEYS.SCORE_HOME
   },
   overrides: {
     [AspectRatio.WIDE]: [],
@@ -108,7 +126,6 @@ export const useStudioStore = create<StudioState>((set) => ({
   })),
   
   setAspectRatio: (ratio) => set((state) => {
-    // Find matching resolution key for the aspect ratio
     const resKey = Object.entries(RESOLUTIONS).find(([_, v]) => v.ratio === ratio)?.[0] as keyof typeof RESOLUTIONS;
     return {
       ui: { ...state.ui, activeResolution: resKey || 'BROADCAST' }
@@ -139,7 +156,6 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   updateLayerTransform: (layerId, transform) => set((state) => {
     if (!state.currentTemplate) return state;
-    // Fix: Using a type assertion for the mapped array prevents TypeScript from widening the union incorrectly.
     return {
       currentTemplate: {
         ...state.currentTemplate,
@@ -152,7 +168,6 @@ export const useStudioStore = create<StudioState>((set) => ({
 
   updateLayerContent: (layerId, content) => set((state) => {
     if (!state.currentTemplate) return state;
-    // Fix: Using a type assertion for the mapped array prevents TypeScript from widening the union incorrectly.
     return {
       currentTemplate: {
         ...state.currentTemplate,

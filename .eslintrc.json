@@ -1,0 +1,20 @@
+
+{
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@studio/*", "**/features/studio/**"],
+            "message": "Data Engine modules must not import from Studio Core. Use @contract instead."
+          },
+          {
+            "group": ["@data-engine/*", "**/features/data-engine/**"],
+            "message": "Studio Core must not import directly from Data Engine ingestion logic. Use @contract instead."
+          }
+        ]
+      }
+    ]
+  }
+}

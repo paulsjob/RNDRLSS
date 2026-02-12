@@ -2,6 +2,45 @@
 import React from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { LogicLayer, LayerType } from '../../../shared/types';
+import { useLiveValue } from '../../../shared/data-runtime/hooks';
+import { MLB_CANON_DICTIONARY } from '../../../contract/dictionaries/mlb';
+import { applyTransforms } from '../../../contract/transforms';
+
+// Internal helper for displaying live value in the inspector
+const LiveValueDisplay: React.FC<{ keyId: string; transforms: string[] }> = ({ keyId, transforms }) => {
+  const record = useLiveValue(keyId);
+  const dictionaryKey = MLB_CANON_DICTIONARY.keys.find(k => k.keyId === keyId);
+  
+  const rawValue = record?.value ?? '—';
+  const resolvedValue = record ? applyTransforms(record.value, transforms) : '—';
+
+  return (
+    <div className="mt-3 bg-black/40 border border-blue-900/20 rounded p-3 space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="text-[9px] text-zinc-500 uppercase font-black tracking-tighter">Live Monitor</span>
+        {record && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>}
+      </div>
+      
+      <div className="flex flex-col">
+        <span className="text-[10px] text-zinc-400 font-medium">{dictionaryKey?.alias || 'Unknown Key'}</span>
+        <span className="text-[12px] text-blue-400 font-mono font-bold truncate">
+          {typeof resolvedValue === 'object' ? JSON.stringify(resolvedValue) : String(resolvedValue)}
+        </span>
+      </div>
+
+      {transforms.length > 0 && (
+        <div className="flex flex-col border-t border-zinc-800/50 pt-2">
+          <span className="text-[8px] text-zinc-600 uppercase font-bold mb-1">Raw: {String(rawValue)}</span>
+          <div className="flex flex-wrap gap-1">
+            {transforms.map(t => (
+              <span key={t} className="px-1 py-0.5 bg-zinc-800 text-zinc-500 text-[8px] rounded uppercase">{t}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const InspectorSidebar: React.FC = () => {
   const { 
@@ -49,6 +88,10 @@ export const InspectorSidebar: React.FC = () => {
     );
   }
 
+  // Get current binding for content/text
+  const bindingKey = `${layer.id}.${layer.type === LayerType.TEXT ? 'text' : 'color'}`;
+  const boundKeyId = currentTemplate.bindings[bindingKey] || '';
+
   return (
     <div className="w-[320px] h-full bg-zinc-900 border-l border-zinc-800 flex flex-col">
       <div className="h-12 border-b border-zinc-800 flex items-center justify-between px-4">
@@ -56,7 +99,7 @@ export const InspectorSidebar: React.FC = () => {
         <span className="text-[9px] font-mono text-zinc-600">#{layer.id.split('-')[1]}</span>
       </div>
       
-      <div className="p-6 space-y-8 overflow-y-auto">
+      <div className="p-6 space-y-8 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
         <section>
           <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Transform</h4>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -134,17 +177,38 @@ export const InspectorSidebar: React.FC = () => {
         <section>
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Data Binding</h4>
-            <div className={`w-1.5 h-1.5 rounded-full ${currentTemplate.bindings[`${layer.id}.${layer.type === LayerType.TEXT ? 'text' : 'color'}`] ? 'bg-blue-500' : 'bg-zinc-700'}`}></div>
+            <div className={`w-1.5 h-1.5 rounded-full ${boundKeyId ? 'bg-blue-500' : 'bg-zinc-700'}`}></div>
           </div>
           <div>
-            <label className="text-[10px] text-zinc-500 block mb-1 uppercase font-medium">Dictionary Path</label>
-            <input 
-              type="text" 
-              placeholder="e.g. game.home.score"
-              value={currentTemplate.bindings[`${layer.id}.${layer.type === LayerType.TEXT ? 'text' : 'color'}`] || ''}
-              onChange={(e) => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', e.target.value)}
-              className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-xs text-blue-400 font-mono focus:border-blue-500 outline-none" 
-            />
+            <label className="text-[10px] text-zinc-500 block mb-1 uppercase font-medium">Contract Key ID (ULID)</label>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="01HS..."
+                value={boundKeyId}
+                onChange={(e) => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', e.target.value)}
+                className="flex-1 bg-black border border-zinc-800 rounded px-3 py-2 text-xs text-blue-400 font-mono focus:border-blue-500 outline-none" 
+              />
+              <select 
+                onChange={(e) => {
+                  if (e.target.value) setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', e.target.value);
+                }}
+                className="w-10 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-400"
+              >
+                <option value="">+</option>
+                {MLB_CANON_DICTIONARY.keys.map(k => (
+                  <option key={k.keyId} value={k.keyId}>{k.alias}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Safe Live Value Preview */}
+            {boundKeyId && (
+              <LiveValueDisplay 
+                keyId={boundKeyId} 
+                transforms={[]} 
+              />
+            )}
           </div>
         </section>
       </div>

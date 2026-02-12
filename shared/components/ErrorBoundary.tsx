@@ -1,5 +1,4 @@
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children?: ReactNode;
@@ -11,7 +10,7 @@ interface State {
   error: Error | null;
 }
 
-// Fixed: Explicitly extending React.Component ensures this.props and this.setState are correctly typed and available.
+// Extending React.Component explicitly fixes the issue where 'this.props' and 'this.setState' were not recognized as members of the class.
 export class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -22,7 +21,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return { hasError: true, error };
   }
 
-  // Fixed: componentDidCatch now correctly accesses this.props inherited from React.Component
+  // Handle errors by logging them to the console and updating the internal error state.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
@@ -30,7 +29,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.groupEnd();
   }
 
-  // Fixed: handleReset now correctly accesses this.setState inherited from React.Component
+  // Reset the error state to allow the application to attempt a recovery render.
   private handleReset = () => {
     this.setState({ hasError: false, error: null });
   };
