@@ -21,6 +21,15 @@ To ensure Renderless can switch data providers seamlessly, we distinguish betwee
 ### 3. Pure Transforms
 Formatting logic is centralized in `contract/transforms.ts`. This ensures data is formatted identically across the Design Canvas and the Live Output.
 
+## Dictionary Utilities (`@contract/utils/dictionary`)
+
+The contract provides standardized helpers for consuming dictionaries:
+
+- **validateDictionary**: Ensures a dictionary conforms to the platform schema and normalizes legacy data (e.g., migrating `path` to `canonicalPath`).
+- **flattenKeys**: Recursively walks the dictionary tree to provide a flat list of keys, including their structural hierarchy (breadcrumbs).
+- **buildKeyIndex**: Creates a `Map` for O(1) lookups of keys by their stable `keyId`.
+- **buildPathIndex**: Creates a reverse-lookup `Map` for resolving `canonicalPath` to `keyId`. Enforces path uniqueness within a dictionary.
+
 ## Boundary Enforcement Matrix
 
 | Source Module | Target: Contract | Target: Shared | Target: Data Engine | Target: Studio Core |
