@@ -30,7 +30,8 @@ export enum KeyScope {
 export interface DictionaryKey {
   keyId: KeyId;
   alias: string;      // Human label for UI (e.g. "Home Score")
-  path: string;       // Stable readable name (e.g. "score.home")
+  category: string;   // UI Grouping (e.g. "Scoreboard", "Advanced Stats")
+  path: string;       // Stable readable name hint (e.g. "score.home")
   dataType: DataType;
   kind: KeyKind;
   scope: KeyScope;

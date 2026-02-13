@@ -1,5 +1,5 @@
 {
-  "name": "Renderless | Cloud-Native Live Graphics",
+  "name": "RNDRLSS | Cloud-Native Live Graphics",
   "description": "A high-performance live graphics platform for sports, news, and finance featuring data-driven templates and responsive multi-aspect ratio outputs.",
   "requestFramePermissions": [
     "camera"

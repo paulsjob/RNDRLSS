@@ -7,6 +7,7 @@ export const KeyIdSchema = z.string();
 export const DictionaryKeySchema = z.object({
   keyId: KeyIdSchema,
   alias: z.string(),
+  category: z.string(),
   path: z.string(),
   dataType: z.nativeEnum(DataType),
   kind: z.nativeEnum(KeyKind),

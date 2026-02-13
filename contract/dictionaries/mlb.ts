@@ -32,6 +32,7 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.GAME_STATUS,
       alias: 'Game Status',
+      category: 'Match Info',
       path: 'game.status',
       dataType: DataType.STRING,
       kind: KeyKind.STATE,
@@ -41,7 +42,8 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.INNING_NUMBER,
       alias: 'Inning Number',
-      path: 'inning.number',
+      category: 'Inning Status',
+      path: 'game.inning',
       dataType: DataType.NUMBER,
       kind: KeyKind.STATE,
       scope: KeyScope.GAME,
@@ -50,6 +52,7 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.INNING_HALF,
       alias: 'Inning Half',
+      category: 'Inning Status',
       path: 'inning.half',
       dataType: DataType.STRING,
       kind: KeyKind.STATE,
@@ -59,7 +62,8 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.SCORE_HOME,
       alias: 'Home Runs',
-      path: 'score.home.runs',
+      category: 'Scoreboard',
+      path: 'score.home',
       dataType: DataType.NUMBER,
       kind: KeyKind.STATE,
       scope: KeyScope.TEAM,
@@ -68,15 +72,27 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.SCORE_AWAY,
       alias: 'Away Runs',
-      path: 'score.away.runs',
+      category: 'Scoreboard',
+      path: 'score.away',
       dataType: DataType.NUMBER,
       kind: KeyKind.STATE,
       scope: KeyScope.TEAM,
       example: 2
     },
     {
+      keyId: MLB_KEYS.COUNT_OUTS,
+      alias: 'Outs',
+      category: 'Game State',
+      path: 'game.outs',
+      dataType: DataType.NUMBER,
+      kind: KeyKind.STATE,
+      scope: KeyScope.GAME,
+      example: 2
+    },
+    {
       keyId: MLB_KEYS.TEAM_HOME_ABBR,
       alias: 'Home Team',
+      category: 'Teams',
       path: 'team.home.abbr',
       dataType: DataType.STRING,
       kind: KeyKind.STATE,
@@ -86,6 +102,7 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.COUNT_BALLS,
       alias: 'Balls',
+      category: 'Game State',
       path: 'count.balls',
       dataType: DataType.NUMBER,
       kind: KeyKind.STATE,
@@ -95,6 +112,7 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.BASES_FIRST,
       alias: 'Runner on 1st',
+      category: 'Bases',
       path: 'bases.first',
       dataType: DataType.BOOLEAN,
       kind: KeyKind.STATE,
@@ -104,6 +122,7 @@ export const MLB_CANON_DICTIONARY: Dictionary = {
     {
       keyId: MLB_KEYS.GAME_EVENTS,
       alias: 'Game Events List',
+      category: 'Signals',
       path: 'game.events',
       dataType: DataType.ARRAY,
       kind: KeyKind.EVENT,
