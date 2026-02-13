@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import { ValueType, DataDomain } from './types';
+import { ValueType, DataDomain, KeyKind } from './types';
 
 export const KeyIdSchema = z.string();
 
@@ -16,10 +16,25 @@ export const DictionaryKeySchema = z.object({
   alias: z.string(),
   valueType: z.nativeEnum(ValueType),
   domain: z.nativeEnum(DataDomain),
+  kind: z.nativeEnum(KeyKind),
+  
+  // Backwards compatibility: Allow either path or canonicalPath
+  path: z.string().optional(),
+  canonicalPath: z.string().optional(),
+  
+  scope: z.string(),
+  dataType: z.string(),
   tags: z.array(z.string()).optional(),
   providerHints: z.array(ProviderHintSchema).optional(),
   unit: z.string().optional(),
   example: z.any().optional(),
+}).transform((data) => {
+  // Migration logic: Normalize path to canonicalPath if canonicalPath is missing
+  if (!data.canonicalPath && data.path) {
+    return { ...data, canonicalPath: data.path };
+  }
+  // Ensure we at least have an empty string or the defined canonicalPath
+  return { ...data, canonicalPath: data.canonicalPath || "" };
 });
 
 // Recursive schema for hierarchical nodes
@@ -78,5 +93,7 @@ export const SnapshotBundleV1Schema = z.object({
   exportedAt: z.number(),
   orgId: z.string(),
   dictionaries: z.array(DictionaryRootSchema),
+  mappings: z.array(z.any()).optional(), // Loose for migration
+  graphs: z.array(z.any()).optional(),   // Loose for migration
   sampleSnapshot: SnapshotMessageSchema.optional(),
 });

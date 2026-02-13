@@ -1,5 +1,5 @@
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children?: ReactNode;
@@ -13,14 +13,17 @@ interface State {
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Uses React.Component to ensure TypeScript resolves props and setState correctly.
+ * Explicitly using React.Component to ensure props and setState are correctly inherited.
  */
-// Fix: Use Component directly from 'react' to resolve property access errors on 'this'.
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null,
-  };
+export class ErrorBoundary extends React.Component<Props, State> {
+  // Use constructor to ensure props and state are correctly typed and initialized.
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -28,7 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   // Handle errors by logging them to the console and updating the internal error state.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Accessing this.props which is now correctly recognized.
+    // Accessing this.props which is now correctly recognized via React.Component inheritance.
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);

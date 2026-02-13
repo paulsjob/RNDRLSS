@@ -25,10 +25,10 @@ export enum KeyKind {
 
 /**
  * Provider-specific metadata for mapping hints.
- * This is informational and decoupled from the stable KeyId.
+ * This is informational and decoupled from the stable KeyId and canonicalPath.
  */
 export interface ProviderHint {
-  providerId: string; // e.g. "sportradar", "genius", "statsperform"
+  providerId: string; // e.g. "sportradar", "geniussports", "statsperform", "sportsdataio", "custom"
   path: string;       // provider-specific JSON path
   notes?: string;
 }
@@ -42,9 +42,17 @@ export interface DictionaryKey {
   alias: string;      // UI display name (rename-safe)
   valueType: ValueType;
   domain: DataDomain;
-  // Added fields to resolve TypeScript errors in UI components
   kind: KeyKind;      
-  path: string;       // JSON path for simulator and raw data resolution
+  
+  /** 
+   * The Renderless normalized payload path.
+   * This is provider-agnostic and defines where the data sits in the internal bus.
+   */
+  canonicalPath: string;
+
+  /** @deprecated use canonicalPath instead */
+  path?: string;
+
   scope: string;      // Categorization for UI grouping
   dataType: string;   // UI-friendly type string
   tags?: string[];
@@ -138,7 +146,7 @@ export interface SnapshotBundleV1 {
   exportedAt: number;
   orgId: string;
   dictionaries: DictionaryRoot[];
-  mappings: MappingSpec[]; // Added to fix SnapshotManager error
-  graphs: any[];           // Added to fix SnapshotManager error
+  mappings: MappingSpec[]; 
+  graphs: any[];           
   sampleSnapshot?: SnapshotMessage;
 }
