@@ -1,12 +1,12 @@
 
-import React, { ErrorInfo, ReactNode, Component } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 // Using more descriptive names for Props and State to avoid conflicts
 interface ErrorBoundaryProps {
   children?: ReactNode;
   featureName?: string;
-  // Explicitly defining key to resolve "Property 'key' does not exist on type 'Props'" errors in some environments
-  key?: React.Key;
+  // Fix: Explicitly adding key to props to resolve "Property 'key' does not exist on type 'ErrorBoundaryProps'" in App.tsx
+  key?: string | number | null;
 }
 
 interface ErrorBoundaryState {
@@ -18,11 +18,12 @@ interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from React.Component to provide error boundary lifecycle methods.
  */
+// Fix: Use explicit Component import to ensure inheritance of props, state, and setState is recognized by TypeScript
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Initializing state in the constructor for robust initialization
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    // Correctly accessing state inherited from Component
+    // Correctly accessing state inherited from React.Component
     this.state = {
       hasError: false,
       error: null,
@@ -36,7 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Correctly accessing props inherited from Component
+    // Correctly accessing props inherited from React.Component
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
@@ -45,12 +46,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // Correctly accessing setState inherited from Component
+    // Correctly accessing setState inherited from React.Component
     this.setState({ hasError: false, error: null });
   };
 
   public render() {
-    // Accessing state and props inherited from Component
+    // Accessing state and props inherited from React.Component
     if (this.state.hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">

@@ -30,6 +30,14 @@ The contract provides standardized helpers for consuming dictionaries:
 - **buildKeyIndex**: Creates a `Map` for O(1) lookups of keys by their stable `keyId`.
 - **buildPathIndex**: Creates a reverse-lookup `Map` for resolving `canonicalPath` to `keyId`. Enforces path uniqueness within a dictionary.
 
+## Dictionary Validation
+
+To maintain the integrity of the data bus, all dictionaries must pass a sanity check before being merged or deployed.
+
+- **Integrity Script**: `contract/tools/validate-dictionaries.ts`
+- **Execution**: The script validates Zod schema compliance, KeyId uniqueness, and CanonicalPath collision-free status.
+- **Enforcement**: This check is integrated into the build process. Any failure in the validation script will block the build pipeline.
+
 ## Boundary Enforcement Matrix
 
 | Source Module | Target: Contract | Target: Shared | Target: Data Engine | Target: Studio Core |
@@ -43,6 +51,7 @@ The contract provides standardized helpers for consuming dictionaries:
 
 ### 1. New Data Domains
 - Add a new dictionary in `contract/dictionaries/`.
+- Run the validation tool to ensure no collisions exist.
 - **Never** modify the Studio to "support" a new domain; it works automatically via the Contract.
 
 ### 2. New Ingestion Logic
