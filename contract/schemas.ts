@@ -1,33 +1,41 @@
 
 import { z } from 'zod';
-import { DataType, KeyKind, KeyScope } from './types';
+import { ValueType, DataDomain } from './types';
 
 export const KeyIdSchema = z.string();
 
-export const DictionaryKeySchema = z.object({
-  keyId: KeyIdSchema,
-  alias: z.string(),
-  category: z.string(),
+export const ProviderHintSchema = z.object({
+  providerId: z.string(),
   path: z.string(),
-  dataType: z.nativeEnum(DataType),
-  kind: z.nativeEnum(KeyKind),
-  scope: z.nativeEnum(KeyScope),
-  tags: z.array(z.string()).optional(),
-  unit: z.string().optional(),
-  formatHint: z.string().optional(),
-  example: z.any().optional(),
-  deprecated: z.object({
-    isDeprecated: z.boolean(),
-    replacementKeyId: KeyIdSchema.optional(),
-    note: z.string().optional(),
-  }).optional(),
+  notes: z.string().optional(),
 });
 
-export const DictionarySchema = z.object({
+export const DictionaryKeySchema = z.object({
+  type: z.literal('key'),
+  keyId: KeyIdSchema,
+  alias: z.string(),
+  valueType: z.nativeEnum(ValueType),
+  domain: z.nativeEnum(DataDomain),
+  tags: z.array(z.string()).optional(),
+  providerHints: z.array(ProviderHintSchema).optional(),
+  unit: z.string().optional(),
+  example: z.any().optional(),
+});
+
+// Recursive schema for hierarchical nodes
+export const DictionaryNodeSchema: z.ZodType<any> = z.lazy(() => 
+  z.object({
+    type: z.literal('node'),
+    name: z.string(),
+    children: z.array(z.union([DictionaryNodeSchema, DictionaryKeySchema])),
+  })
+);
+
+export const DictionaryRootSchema = z.object({
   dictionaryId: z.string(),
   version: z.string(),
-  domain: z.enum(['sports', 'politics', 'weather', 'finance', 'news']),
-  keys: z.array(DictionaryKeySchema),
+  domain: z.nativeEnum(DataDomain),
+  root: DictionaryNodeSchema,
 });
 
 const BaseEnvelope = z.object({
@@ -65,29 +73,10 @@ export const LiveMessageSchema = z.discriminatedUnion('type', [
   EventMessageSchema,
 ]);
 
-export const NodeGraphSpecSchema = z.object({
-  nodes: z.array(z.any()),
-  edges: z.array(z.any()),
-});
-
-export const MappingRuleSchema = z.object({
-  fromPath: z.string(),
-  toKeyId: KeyIdSchema,
-  transforms: z.array(z.string()).optional(),
-});
-
-export const MappingSpecSchema = z.object({
-  mappingId: z.string(),
-  outputDictionaryId: z.string(),
-  rules: z.array(MappingRuleSchema),
-});
-
 export const SnapshotBundleV1Schema = z.object({
   bundleVersion: z.literal("1.0.0"),
   exportedAt: z.number(),
   orgId: z.string(),
-  dictionaries: z.array(DictionarySchema),
-  mappings: z.array(MappingSpecSchema),
-  graphs: z.array(NodeGraphSpecSchema),
+  dictionaries: z.array(DictionaryRootSchema),
   sampleSnapshot: SnapshotMessageSchema.optional(),
 });

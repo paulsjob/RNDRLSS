@@ -1,56 +1,103 @@
 
-export type KeyId = string; // ULID format recommended
+export type KeyId = string; // ULID format recommended for immutability and provider-agnosticism
 
-export enum DataType {
-  NUMBER = 'number',
+export enum ValueType {
   STRING = 'string',
+  NUMBER = 'number',
   BOOLEAN = 'boolean',
   OBJECT = 'object',
-  ARRAY = 'array',
-  NULL = 'null',
-  PERCENTAGE = 'percentage'
+  ARRAY = 'array'
 }
 
+export enum DataDomain {
+  SPORTS = 'sports',
+  WEATHER = 'weather',
+  FINANCE = 'finance',
+  POLITICS = 'politics',
+  GENERIC = 'generic'
+}
+
+// Added KeyKind enum for UI filtering and simulation logic
 export enum KeyKind {
   STATE = 'state',
   EVENT = 'event'
 }
 
-export enum KeyScope {
-  GLOBAL = 'global',
-  GAME = 'game',
-  TEAM = 'team',
-  PLAYER = 'player',
-  CANDIDATE = 'candidate',
-  MARKET = 'market',
-  LOCATION = 'location',
-  CUSTOM = 'custom'
+/**
+ * Provider-specific metadata for mapping hints.
+ * This is informational and decoupled from the stable KeyId.
+ */
+export interface ProviderHint {
+  providerId: string; // e.g. "sportradar", "genius", "statsperform"
+  path: string;       // provider-specific JSON path
+  notes?: string;
 }
 
+/**
+ * Leaf node in the dictionary representing a specific data point.
+ */
 export interface DictionaryKey {
-  keyId: KeyId;
-  alias: string;      // Human label for UI (e.g. "Home Score")
-  category: string;   // UI Grouping (e.g. "Scoreboard", "Advanced Stats")
-  path: string;       // Stable readable name hint (e.g. "score.home")
-  dataType: DataType;
-  kind: KeyKind;
-  scope: KeyScope;
+  type: 'key';
+  keyId: KeyId;       // Machine-safe, immutable, provider-agnostic
+  alias: string;      // UI display name (rename-safe)
+  valueType: ValueType;
+  domain: DataDomain;
+  // Added fields to resolve TypeScript errors in UI components
+  kind: KeyKind;      
+  path: string;       // JSON path for simulator and raw data resolution
+  scope: string;      // Categorization for UI grouping
+  dataType: string;   // UI-friendly type string
   tags?: string[];
+  providerHints?: ProviderHint[];
   unit?: string;
-  formatHint?: string;
   example?: any;
-  deprecated?: {
-    isDeprecated: boolean;
-    replacementKeyId?: KeyId;
-    note?: string;
-  };
 }
 
-export interface Dictionary {
+/**
+ * Branch node used for grouping keys into folders/categories.
+ */
+export interface DictionaryNode {
+  type: 'node';
+  name: string;
+  children: (DictionaryNode | DictionaryKey)[];
+}
+
+/**
+ * Root container for a Canonical Data Dictionary.
+ */
+export interface DictionaryRoot {
   dictionaryId: string;
   version: string;
-  domain: 'sports' | 'politics' | 'weather' | 'finance' | 'news';
-  keys: DictionaryKey[];
+  domain: DataDomain;
+  root: DictionaryNode;
+}
+
+/**
+ * Mapping Rule for converting raw data to canonical keys.
+ */
+export interface MappingRule {
+  fromPath: string;
+  toKeyId: KeyId;
+  transforms?: string[];
+  constant?: any;
+}
+
+/**
+ * Specification for a data mapping engine.
+ */
+export interface MappingSpec {
+  mappingId: string;
+  inputSchemaId: string;
+  outputDictionaryId: string;
+  rules: MappingRule[];
+}
+
+/**
+ * Legacy/Compatibility types (retained for shared layer stability)
+ */
+export interface Dictionary extends DictionaryRoot {
+  // Flat view helper for legacy logic
+  keys: DictionaryKey[]; 
 }
 
 // Message Envelopes
@@ -85,42 +132,13 @@ export interface EventMessage extends BaseMessage {
 
 export type LiveMessage = SnapshotMessage | DeltaMessage | EventMessage;
 
-// Node Engine Specs
-export interface NodeGraphSpec {
-  nodes: any[];
-  edges: any[];
-}
-
-// Mapping Specs
-export interface MappingRule {
-  fromPath: string;
-  toKeyId: KeyId;
-  transforms?: string[];
-}
-
-export interface MappingSpec {
-  mappingId: string;
-  outputDictionaryId: string;
-  rules: MappingRule[];
-}
-
-// Studio Bindings
-export interface DataBinding {
-  bindingId: string;
-  layerId: string;
-  targetPath: string; // e.g. "content.text"
-  keyId: KeyId;
-  transforms: string[];
-  fallback?: any;
-}
-
 // ITEM 03: Snapshot Bundle V1
 export interface SnapshotBundleV1 {
   bundleVersion: "1.0.0";
   exportedAt: number;
   orgId: string;
-  dictionaries: Dictionary[];
-  mappings: MappingSpec[];
-  graphs: NodeGraphSpec[];
+  dictionaries: DictionaryRoot[];
+  mappings: MappingSpec[]; // Added to fix SnapshotManager error
+  graphs: any[];           // Added to fix SnapshotManager error
   sampleSnapshot?: SnapshotMessage;
 }
