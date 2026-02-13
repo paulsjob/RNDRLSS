@@ -7,14 +7,52 @@
         "patterns": [
           {
             "group": ["@studio/*", "**/features/studio/**"],
-            "message": "Data Engine modules must not import from Studio Core. Use @contract instead."
+            "message": "Boundary Violation: Data Engine and Shared modules must not import from Studio Core. Interaction must occur via the @contract layer or LiveBus."
           },
           {
             "group": ["@data-engine/*", "**/features/data-engine/**"],
-            "message": "Studio Core must not import directly from Data Engine ingestion logic. Use @contract instead."
+            "message": "Boundary Violation: Studio Core must not import directly from Data Engine logic. Use @contract or shared hooks instead."
           }
         ]
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["features/data-engine/**/*", "contract/**/*", "shared/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@studio/*", "**/features/studio/**"],
+                "message": "Critical Boundary Violation: Non-Studio modules are strictly prohibited from depending on Studio Core internals."
+              },
+              {
+                "group": ["**/index.tsx", "**/App.tsx", "**/types.ts", "**/services/resolver.ts", "**/services/liveService.ts", "**/schema/**"],
+                "message": "Boundary Violation: Direct dependency on application entry points or legacy root services is prohibited. Use @shared or @contract."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["contract/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@studio/*", "@data-engine/*", "@shared/*", "**/features/**", "**/shared/**"],
+                "message": "Contract Layer Violation: The contract must be a dependency-free source of truth. It cannot import from feature modules or shared utilities."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

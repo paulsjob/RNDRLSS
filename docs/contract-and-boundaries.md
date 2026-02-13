@@ -1,25 +1,39 @@
 
 # Renderless Contract & Boundaries
 
-This module (`/contract`) defines the authoritative schema for all live data flowing through the Renderless engine.
+This documentation defines the architectural constraints that maintain the integrity of the Renderless engine.
 
-## Core Rules
-1. **Studio is Opaque**: The Studio never sees provider-specific JSON paths. It binds solely to `keyId` (ULID) strings.
-2. **Authoritative Alias**: The human-readable label shown in the Studio property inspector comes from the `DictionaryKey.alias`, not the provider.
-3. **Pure Transforms**: Formatting (uppercase, percentage, fixed decimals) is handled via a shared transform registry in the contract.
+## Core Architectural Rules
 
-## How to Extend
+### 1. Studio Core is a Black Box
+The Studio never sees provider-specific JSON paths or ingestion logic. It binds solely to `keyId` (ULID) strings defined in the Contract.
+- **Locked Status:** All files in `features/studio/`, root entry points (`index.tsx`, `App.tsx`), and root definitions (`types.ts`) are locked.
+- **Enforcement:** ESLint prevents any external module from importing Studio internals.
 
-### 1. Adding a New Domain (e.g. Politics)
-1. Create a new dictionary definition in `contract/dictionaries/politics.ts`.
-2. Generate ULIDs for each new key.
-3. Register the domain in the `contract/types.ts` domain enum.
+### 2. Authoritative Aliasing
+Human-readable labels shown in the Studio come from `DictionaryKey.alias`. This ensures the UI remains consistent regardless of the underlying data provider.
 
-### 2. Adding a New Provider Mapping
-1. Create a `MappingSpec` object (usually in the `features/data-engine` ingestion service).
-2. Map the raw provider paths (e.g., `payload.homeScore`) to the canonical `keyId` (e.g., `01HS1K7...`).
-3. Deploy the mapping. The Studio will automatically start showing live values if the `keyId` matches an existing binding.
+### 3. Pure Transforms
+Formatting logic is centralized in `contract/transforms.ts`. This ensures data is formatted identically across the Design Canvas and the Live Output.
 
-## Boundary Enforcement
-- **No Direct Coupling**: Studio Core logic is protected. Do not import UI components into the contract or data engine.
-- **Dependency Flow**: `Studio` -> `Contract` <- `Data Engine`.
+## Boundary Enforcement Matrix
+
+| Source Module | Target: Contract | Target: Shared | Target: Data Engine | Target: Studio Core |
+| :--- | :---: | :---: | :---: | :---: |
+| **Contract** | ✅ | ❌ | ❌ | ❌ |
+| **Shared** | ✅ | ✅ | ❌ | ❌ |
+| **Data Engine** | ✅ | ✅ | ✅ | ❌ |
+| **Studio Core** | ✅ | ✅ | ❌ | ✅ |
+
+## Workflow for New Features
+
+### 1. New Data Domains
+- Add a new dictionary in `contract/dictionaries/`.
+- **Never** modify the Studio to "support" a new domain; it works automatically via the Contract.
+
+### 2. New Ingestion Logic
+- All mapping and node-based logic happens in `features/data-engine`.
+- Use the `LiveBus` to publish updates.
+
+## Violation Handling
+Any attempt to cross these boundaries will result in a linting error (`no-restricted-imports`). Do not use `eslint-disable` to bypass these rules.
