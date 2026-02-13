@@ -1,50 +1,56 @@
 
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode, Component } from 'react';
 
-interface Props {
+// Using more descriptive names for Props and State to avoid conflicts
+interface ErrorBoundaryProps {
   children?: ReactNode;
   featureName?: string;
+  // Explicitly defining key to resolve "Property 'key' does not exist on type 'Props'" errors in some environments
+  key?: React.Key;
 }
 
-interface State {
+interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Explicitly using React.Component to ensure props and setState are correctly inherited.
+ * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-export class ErrorBoundary extends React.Component<Props, State> {
-  // Use constructor to ensure props and state are correctly typed and initialized.
-  constructor(props: Props) {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Initializing state in the constructor for robust initialization
+  constructor(props: ErrorBoundaryProps) {
     super(props);
+    // Correctly accessing state inherited from Component
     this.state = {
       hasError: false,
       error: null,
     };
   }
 
-  public static getDerivedStateFromError(error: Error): State {
+  // Standard React Error Boundary static method to update state from errors
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  // Handle errors by logging them to the console and updating the internal error state.
+  // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Accessing this.props which is now correctly recognized via React.Component inheritance.
+    // Correctly accessing props inherited from Component
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
     console.groupEnd();
   }
 
-  // Reset the error state to allow the application to attempt a recovery render.
+  // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // Calling this.setState which is now correctly recognized.
+    // Correctly accessing setState inherited from Component
     this.setState({ hasError: false, error: null });
   };
 
   public render() {
+    // Accessing state and props inherited from Component
     if (this.state.hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">

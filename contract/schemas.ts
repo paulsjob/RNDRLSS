@@ -18,7 +18,7 @@ export const DictionaryKeySchema = z.object({
   domain: z.nativeEnum(DataDomain),
   kind: z.nativeEnum(KeyKind),
   
-  // Backwards compatibility: Allow either path or canonicalPath
+  // Backwards compatibility: Accept either path or canonicalPath on input
   path: z.string().optional(),
   canonicalPath: z.string().optional(),
   
@@ -30,11 +30,8 @@ export const DictionaryKeySchema = z.object({
   example: z.any().optional(),
 }).transform((data) => {
   // Migration logic: Normalize path to canonicalPath if canonicalPath is missing
-  if (!data.canonicalPath && data.path) {
-    return { ...data, canonicalPath: data.path };
-  }
-  // Ensure we at least have an empty string or the defined canonicalPath
-  return { ...data, canonicalPath: data.canonicalPath || "" };
+  const canonicalPath = data.canonicalPath || data.path || "";
+  return { ...data, canonicalPath };
 });
 
 // Recursive schema for hierarchical nodes
@@ -93,7 +90,7 @@ export const SnapshotBundleV1Schema = z.object({
   exportedAt: z.number(),
   orgId: z.string(),
   dictionaries: z.array(DictionaryRootSchema),
-  mappings: z.array(z.any()).optional(), // Loose for migration
-  graphs: z.array(z.any()).optional(),   // Loose for migration
+  mappings: z.array(z.any()).optional(),
+  graphs: z.array(z.any()).optional(),
   sampleSnapshot: SnapshotMessageSchema.optional(),
 });

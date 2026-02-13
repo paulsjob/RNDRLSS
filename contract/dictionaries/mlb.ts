@@ -1,5 +1,5 @@
 
-import { Dictionary, ValueType, DataDomain, KeyKind } from '../types';
+import { Dictionary, DictionaryKey, ValueType, DataDomain, KeyKind } from '../types';
 
 /**
  * MACHINE-SAFE AGNOSTIC KEYS
@@ -24,7 +24,7 @@ export const MLB_KEYS = {
 } as const;
 
 // Flattened keys for internal logic compatibility across Studio and Data Engine
-const mlbKeys: any[] = [
+const mlbKeys: DictionaryKey[] = [
   { type: 'key', keyId: MLB_KEYS.GAME_STATUS, alias: 'Game Status', valueType: ValueType.STRING, kind: KeyKind.STATE, canonicalPath: 'game.status', scope: 'Game', domain: DataDomain.SPORTS, dataType: 'string' },
   { type: 'key', keyId: MLB_KEYS.GAME_CLOCK, alias: 'Game Clock', valueType: ValueType.STRING, kind: KeyKind.STATE, canonicalPath: 'game.clock', scope: 'Game', domain: DataDomain.SPORTS, dataType: 'string' },
   { type: 'key', keyId: MLB_KEYS.INNING_NUMBER, alias: 'Inning', valueType: ValueType.NUMBER, kind: KeyKind.STATE, canonicalPath: 'game.inning', scope: 'Inning', domain: DataDomain.SPORTS, dataType: 'number' },

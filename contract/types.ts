@@ -17,7 +17,6 @@ export enum DataDomain {
   GENERIC = 'generic'
 }
 
-// Added KeyKind enum for UI filtering and simulation logic
 export enum KeyKind {
   STATE = 'state',
   EVENT = 'event'
@@ -47,10 +46,14 @@ export interface DictionaryKey {
   /** 
    * The Renderless normalized payload path.
    * This is provider-agnostic and defines where the data sits in the internal bus.
+   * REQUIRED for all new keys.
    */
   canonicalPath: string;
 
-  /** @deprecated use canonicalPath instead */
+  /** 
+   * @deprecated Use canonicalPath instead. 
+   * Maintained for backwards compatibility during migration.
+   */
   path?: string;
 
   scope: string;      // Categorization for UI grouping
@@ -81,23 +84,13 @@ export interface DictionaryRoot {
 }
 
 /**
- * Mapping Rule for converting raw data to canonical keys.
- */
-export interface MappingRule {
-  fromPath: string;
-  toKeyId: KeyId;
-  transforms?: string[];
-  constant?: any;
-}
-
-/**
  * Specification for a data mapping engine.
  */
 export interface MappingSpec {
   mappingId: string;
   inputSchemaId: string;
   outputDictionaryId: string;
-  rules: MappingRule[];
+  rules: any[]; // Mapping rules defined in mapping.ts
 }
 
 /**
