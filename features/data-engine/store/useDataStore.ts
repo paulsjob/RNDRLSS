@@ -124,7 +124,6 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
-  // ADD: Missing state for DataEngineView workflow coach
   demoCoach: {
     isDismissed: boolean;
   };
@@ -138,6 +137,7 @@ interface DataState {
   deployment: {
     status: DeploymentStatus;
     lastDeployedAt: number | null;
+    deployedEndpointId: string | null;
     endpointUrl: string | null;
     manifest: {
       nodes: number;
@@ -154,7 +154,6 @@ interface DataState {
   // Flow Actions (ITEM 40)
   registerNodeActivity: (nodeId: string) => void;
 
-  // ADD: Missing action to manage coach visibility
   setCoachDismissed: (isDismissed: boolean) => void;
 
   // Setup/Mode Actions (Secondary)
@@ -264,7 +263,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   nodes: [],
   edges: [],
 
-  // FIX: Initialize demoCoach state
   demoCoach: {
     isDismissed: false
   },
@@ -278,6 +276,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   deployment: {
     status: 'idle',
     lastDeployedAt: null,
+    deployedEndpointId: null,
     endpointUrl: null,
     manifest: null,
   },
@@ -292,7 +291,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     }
   })),
 
-  // FIX: Implement setCoachDismissed action
   setCoachDismissed: (isDismissed) => set(state => ({
     demoCoach: { ...state.demoCoach, isDismissed }
   })),
@@ -367,7 +365,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     set({
       selection: { kind: null, id: null, label: null, canonicalPath: null },
       validation: { status: 'idle', results: [], lastValidated: 0, offendingNodeIds: new Set() },
-      deployment: { status: 'idle', lastDeployedAt: null, endpointUrl: null, manifest: null },
+      deployment: { status: 'idle', lastDeployedAt: null, deployedEndpointId: null, endpointUrl: null, manifest: null },
       isTruthMode: false,
       selectedTraceId: null,
       demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
@@ -725,6 +723,7 @@ export const useDataStore = create<DataState>((set, get) => ({
         deployment: { 
           status: 'success', 
           lastDeployedAt: Date.now(),
+          deployedEndpointId: streamId,
           endpointUrl: mockUrl,
           manifest: {
             nodes: nodes.length,
@@ -743,7 +742,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   resetDeployment: () => {
-    set({ deployment: { status: 'idle', lastDeployedAt: null, endpointUrl: null, manifest: null } });
+    set({ deployment: { status: 'idle', lastDeployedAt: null, deployedEndpointId: null, endpointUrl: null, manifest: null } });
   },
 
   setOrgId: (id) => {
