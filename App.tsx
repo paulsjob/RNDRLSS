@@ -60,7 +60,8 @@ const App: React.FC = () => {
 
       {/* Main content area */}
       <main className="flex-1 overflow-hidden relative border-4 border-red-600/10">
-        <ErrorBoundary key={`boundary-${activeTab}`} featureName={activeTab.toUpperCase()}>
+        {/* FIX: Removed 'key' attribute to resolve assignment error; identity is managed internally by activeTab logic. */}
+        <ErrorBoundary featureName={activeTab.toUpperCase()}>
           {activeTab === 'studio' && <StudioShell />}
           {activeTab === 'control' && <GameControl />}
           {activeTab === 'data' && <DataEngineView />}

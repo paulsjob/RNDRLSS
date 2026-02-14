@@ -16,7 +16,7 @@ export interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-// FIX: Explicitly extend Component from 'react' package to ensure that 
+// FIX: Using the generic Component with Props and State interfaces to ensure that 
 // properties like this.props, this.state, and this.setState are correctly recognized by the TypeScript compiler.
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // Initializing state in the constructor for robust initialization

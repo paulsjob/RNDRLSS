@@ -3,9 +3,11 @@ import { create } from 'zustand';
 export interface Asset {
   id: string;
   name: string;
-  type: 'image' | 'video' | 'folder';
+  type: 'image' | 'video' | 'audio' | 'folder';
   parentId: string | null;
   url?: string;
+  width?: number;
+  height?: number;
 }
 
 interface AssetStore {
@@ -13,11 +15,15 @@ interface AssetStore {
   currentFolderId: string | null;
   isCreateModalOpen: boolean;
   viewMode: 'grid' | 'list';
+  quickViewMode: 'grid' | 'list';
+  filterType: 'all' | 'image' | 'video' | 'audio';
   
   // Actions
   setCurrentFolderId: (id: string | null) => void;
   setCreateModalOpen: (open: boolean) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
+  setQuickViewMode: (mode: 'grid' | 'list') => void;
+  setFilterType: (type: 'all' | 'image' | 'video' | 'audio') => void;
   createFolder: (name: string) => void;
   deleteAsset: (id: string) => void;
 }
@@ -25,8 +31,33 @@ interface AssetStore {
 const MOCK_ASSETS: Asset[] = [
   { id: 'f-1', name: 'Backgrounds', type: 'folder', parentId: null },
   { id: 'f-2', name: 'Team Logos', type: 'folder', parentId: null },
-  { id: 'a-1', name: 'Stadium Night', type: 'image', parentId: 'f-1', url: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?auto=format&fit=crop&w=400' },
-  { id: 'a-2', name: 'Seahawks Logo', type: 'image', parentId: 'f-2', url: 'https://logo.clearbit.com/seahawks.com' },
+  { 
+    id: 'a-1', 
+    name: 'Stadium Night', 
+    type: 'image', 
+    parentId: 'f-1', 
+    url: 'https://images.unsplash.com/photo-1504450758481-7338eba7524a?auto=format&fit=crop&w=400',
+    width: 1920,
+    height: 1080
+  },
+  { 
+    id: 'a-2', 
+    name: 'Seahawks Logo', 
+    type: 'image', 
+    parentId: 'f-2', 
+    url: 'https://logo.clearbit.com/seahawks.com',
+    width: 512,
+    height: 512
+  },
+  {
+    id: 'a-3',
+    name: 'Intro loop',
+    type: 'video',
+    parentId: 'f-1',
+    url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+    width: 1280,
+    height: 720
+  }
 ];
 
 export const useAssetStore = create<AssetStore>((set, get) => ({
@@ -34,10 +65,14 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   currentFolderId: null,
   isCreateModalOpen: false,
   viewMode: 'grid',
+  quickViewMode: 'list',
+  filterType: 'all',
 
   setCurrentFolderId: (id) => set({ currentFolderId: id }),
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setQuickViewMode: (mode) => set({ quickViewMode: mode }),
+  setFilterType: (type) => set({ filterType: type }),
 
   createFolder: (name) => {
     const { assets, currentFolderId } = get();

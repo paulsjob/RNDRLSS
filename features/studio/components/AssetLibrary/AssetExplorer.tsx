@@ -1,13 +1,24 @@
 import React from 'react';
-import { useAssetStore } from '../../store/useAssetStore';
+import { useAssetStore, Asset } from '../../store/useAssetStore';
+import { useStudioStore } from '../../store/useStudioStore';
 import { Button } from '../../../../shared/components/Button';
 import { NewFolderModal } from './NewFolderModal';
 
 export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { assets, currentFolderId, setCurrentFolderId, setCreateModalOpen, viewMode, setViewMode } = useAssetStore();
+  const { addAssetLayer } = useStudioStore();
 
   const currentAssets = assets.filter(a => a.parentId === currentFolderId);
   const currentFolder = assets.find(a => a.id === currentFolderId);
+
+  const handleAssetClick = (asset: Asset) => {
+    if (asset.type === 'folder') {
+      setCurrentFolderId(asset.id);
+    } else {
+      addAssetLayer(asset);
+      // We don't necessarily close the explorer so the user can add multiple assets
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-12 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
@@ -81,7 +92,7 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                  {currentAssets.map(asset => (
                    <div 
                      key={asset.id}
-                     onClick={() => asset.type === 'folder' && setCurrentFolderId(asset.id)}
+                     onClick={() => handleAssetClick(asset)}
                      className="group flex flex-col items-center gap-4 p-5 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300"
                    >
                      <div className="w-20 h-20 flex items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 group-hover:bg-black group-hover:border-blue-500/50 shadow-inner transition-all duration-300">
@@ -102,7 +113,7 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                   {currentAssets.map(asset => (
                     <div 
                       key={asset.id}
-                      onClick={() => asset.type === 'folder' && setCurrentFolderId(asset.id)}
+                      onClick={() => handleAssetClick(asset)}
                       className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/20 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 group cursor-pointer transition-all"
                     >
                       <div className="flex items-center gap-5">

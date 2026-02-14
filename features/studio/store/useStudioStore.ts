@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { 
   GraphicTemplate, 
@@ -9,6 +8,7 @@ import {
   RESOLUTIONS 
 } from '../../../shared/types';
 import { MLB_KEYS } from '../../../contract/dictionaries/mlb';
+import { Asset } from './useAssetStore';
 
 interface StudioState {
   // Template Data
@@ -38,6 +38,7 @@ interface StudioState {
   updateLayerTransform: (layerId: string, transform: Partial<Layer['transform']>) => void;
   updateLayerContent: (layerId: string, content: Partial<any>) => void;
   addLayer: (type: LayerType) => void;
+  addAssetLayer: (asset: Asset) => void;
   removeLayer: (id: string) => void;
   setBinding: (layerId: string, property: string, dictionaryItemId: string | null) => void;
 }
@@ -222,6 +223,75 @@ export const useStudioStore = create<StudioState>((set) => ({
         ...state.currentTemplate,
         layers: [...state.currentTemplate.layers, newLayer]
       }
+    };
+  }),
+
+  addAssetLayer: (asset) => set((state) => {
+    if (!state.currentTemplate) return state;
+
+    const res = RESOLUTIONS[state.ui.activeResolution] || RESOLUTIONS.BROADCAST;
+    const cw = res.width;
+    const ch = res.height;
+    
+    // Use natural dimensions if available, otherwise default
+    const iw = asset.width || 800;
+    const ih = asset.height || 600;
+    
+    let width, height, x, y;
+    
+    // Requirement: If exactly 1920x1080 and canvas is 1920x1080, fill frame
+    if (iw === 1920 && ih === 1080 && cw === 1920 && ch === 1080) {
+      width = 1920;
+      height = 1080;
+      x = 0;
+      y = 0;
+    } else {
+      // Requirement: Otherwise, fit within 80% of canvas width/height preserving aspect ratio
+      const maxW = cw * 0.8;
+      const maxH = ch * 0.8;
+      const scale = Math.min(maxW / iw, maxH / ih);
+      width = iw * scale;
+      height = ih * scale;
+      x = (cw - width) / 2;
+      y = (ch - height) / 2;
+    }
+
+    const id = `layer-asset-${Math.random().toString(36).substr(2, 9)}`;
+    const baseLayer = {
+      id,
+      name: asset.name,
+      visible: true,
+      locked: false,
+      transform: { x, y, width, height, opacity: 1, rotation: 0 }
+    };
+
+    let newLayer: Layer;
+    if (asset.type === 'video') {
+      newLayer = {
+        ...baseLayer,
+        type: LayerType.VIDEO,
+        content: { url: asset.url || '', loop: true, muted: true, autoPlay: true }
+      };
+    } else if (asset.type === 'audio') {
+      newLayer = {
+        ...baseLayer,
+        type: LayerType.AUDIO,
+        content: { url: asset.url || '', volume: 1, playbackRate: 1 }
+      };
+    } else {
+      newLayer = {
+        ...baseLayer,
+        type: LayerType.IMAGE,
+        content: { url: asset.url || '', fit: 'contain' }
+      };
+    }
+
+    return {
+      currentTemplate: {
+        ...state.currentTemplate,
+        layers: [...state.currentTemplate.layers, newLayer]
+      },
+      selection: { selectedLayerId: id }
     };
   }),
 
