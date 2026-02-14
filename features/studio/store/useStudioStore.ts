@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { 
   GraphicTemplate, 
@@ -9,6 +10,8 @@ import {
 } from '../../../shared/types';
 import { MLB_KEYS } from '../../../contract/dictionaries/mlb';
 import { Asset } from './useAssetStore';
+import { liveBus } from '../../../shared/data-runtime';
+import { applyTransforms } from '../../../contract/transforms';
 
 interface StudioState {
   // Template Data
@@ -40,7 +43,7 @@ interface StudioState {
   addLayer: (type: LayerType) => void;
   addAssetLayer: (asset: Asset) => void;
   removeLayer: (id: string) => void;
-  setBinding: (layerId: string, property: string, dictionaryItemId: string | null) => void;
+  setBinding: (layerId: string, property: string, dictionaryItemId: string | null, transform?: string) => void;
 }
 
 const INITIAL_TEMPLATE: GraphicTemplate = {
@@ -109,7 +112,7 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
   }
 };
 
-export const useStudioStore = create<StudioState>((set) => ({
+export const useStudioStore = create<StudioState>((set, get) => ({
   currentTemplate: INITIAL_TEMPLATE,
   ui: {
     leftPanelOpen: true,
@@ -305,17 +308,96 @@ export const useStudioStore = create<StudioState>((set) => ({
     };
   }),
 
-  setBinding: (layerId, property, dictionaryItemId) => set((state) => {
+  setBinding: (layerId, property, dictionaryItemId, transform = 'none') => set((state) => {
     if (!state.currentTemplate) return state;
     const newBindings = { ...state.currentTemplate.bindings };
     const key = `${layerId}.${property}`;
+    
     if (!dictionaryItemId) {
       delete newBindings[key];
+      // Restore static text if available
+      const layer = state.currentTemplate.layers.find(l => l.id === layerId);
+      if (layer && (layer.content as any).staticText !== undefined) {
+        return {
+          currentTemplate: {
+            ...state.currentTemplate,
+            bindings: newBindings,
+            layers: state.currentTemplate.layers.map(l => 
+              l.id === layerId ? { 
+                ...l, 
+                content: { ...l.content, text: (l.content as any).staticText } 
+              } : l
+            ) as Layer[]
+          }
+        };
+      }
     } else {
-      newBindings[key] = dictionaryItemId;
+      // Encode keyId and transform into the binding value to keep compatibility with Record<string, string>
+      newBindings[key] = `${dictionaryItemId}|${transform}`;
     }
+    
     return {
       currentTemplate: { ...state.currentTemplate, bindings: newBindings }
     };
   })
 }));
+
+/**
+ * LIVE DATA SYNC MANAGER
+ * Listens to the LiveBus and updates the store state for bound layers.
+ * This ensures that even legacy stage components see live data updates in content.text.
+ */
+liveBus.subscribeAll((msg) => {
+  const state = useStudioStore.getState();
+  const template = state.currentTemplate;
+  if (!template) return;
+
+  // Extract changed keys
+  let changedValues: Record<string, any> = {};
+  if (msg.type === 'snapshot') {
+    changedValues = msg.values;
+  } else if (msg.type === 'delta') {
+    msg.changes.forEach(c => { changedValues[c.keyId] = c.value; });
+  } else {
+    return; // Events ignored for simple text binding
+  }
+
+  // Find layers affected by these changes
+  const updates: Record<string, Partial<any>> = {};
+  let hasUpdates = false;
+
+  Object.entries(template.bindings).forEach(([bindingKey, value]) => {
+    // FIX: Explicitly cast value to string to resolve 'unknown' type error during split() call.
+    const [keyId, transform] = (value as string).split('|');
+    if (changedValues[keyId] !== undefined) {
+      const [layerId, property] = bindingKey.split('.');
+      const layer = template.layers.find(l => l.id === layerId);
+      if (layer && property === 'text' && layer.type === LayerType.TEXT) {
+        const rawValue = changedValues[keyId];
+        const processedValue = applyTransforms(rawValue, transform === 'none' ? [] : [transform]);
+        
+        // Prepare content update
+        const contentUpdate: any = { text: String(processedValue) };
+        
+        // Persist original static text if not already saved
+        if ((layer.content as any).staticText === undefined) {
+          contentUpdate.staticText = (layer.content as any).text;
+        }
+
+        updates[layerId] = contentUpdate;
+        hasUpdates = true;
+      }
+    }
+  });
+
+  if (hasUpdates) {
+    useStudioStore.setState({
+      currentTemplate: {
+        ...template,
+        layers: template.layers.map(l => 
+          updates[l.id] ? { ...l, content: { ...l.content, ...updates[l.id] } } : l
+        ) as Layer[]
+      }
+    });
+  }
+});

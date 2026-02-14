@@ -75,7 +75,6 @@ export const InspectorSidebar: React.FC = () => {
   } = useStudioStore();
 
   const { orgId } = useDataStore();
-  const [selectedTransform, setSelectedTransform] = useState<string>('none');
   
   // Sync dictionary registry for lookup safety
   const [availableDicts, setAvailableDicts] = useState<Dictionary[]>([]);
@@ -139,10 +138,11 @@ export const InspectorSidebar: React.FC = () => {
   }
 
   const bindingKey = `${layer.id}.${layer.type === LayerType.TEXT ? 'text' : 'color'}`;
-  const boundKeyId = currentTemplate.bindings[bindingKey] || '';
+  const bindingValue = currentTemplate.bindings[bindingKey] || '';
+  const [boundKeyId, boundTransform] = bindingValue.includes('|') ? bindingValue.split('|') : [bindingValue, 'none'];
   const boundLookup = boundKeyId ? dictionaryRegistry.getKey(boundKeyId) : null;
 
-  const transforms = selectedTransform === 'none' ? [] : [selectedTransform];
+  const transforms = boundTransform === 'none' ? [] : [boundTransform];
 
   return (
     <div className="w-[320px] h-full bg-zinc-900 border-l border-zinc-800 flex flex-col shadow-2xl">
@@ -204,7 +204,7 @@ export const InspectorSidebar: React.FC = () => {
                   dictionaries={availableDicts}
                   selectedKeyId={boundKeyId}
                   onSelect={(id) => {
-                    setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', id);
+                    setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', id, boundTransform);
                     setIsBindingMode(false);
                   }}
                 />
@@ -246,8 +246,8 @@ export const InspectorSidebar: React.FC = () => {
                     <div className="space-y-2">
                       <label className="text-[9px] text-zinc-600 uppercase font-black tracking-widest ml-1">Live Transformer</label>
                       <select 
-                        value={selectedTransform}
-                        onChange={(e) => setSelectedTransform(e.target.value)}
+                        value={boundTransform}
+                        onChange={(e) => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', boundKeyId, e.target.value)}
                         className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-[10px] font-bold text-zinc-400 focus:border-blue-500 outline-none hover:border-zinc-700 transition-colors cursor-pointer"
                       >
                         <option value="none">None (Raw Output)</option>
