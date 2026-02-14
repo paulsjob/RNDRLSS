@@ -27,6 +27,9 @@ const ADAPTERS: DataAdapter[] = [
   new WeatherAdapter()
 ];
 
+export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
+export type DeploymentStatus = 'idle' | 'deploying' | 'success';
+
 interface ImportResult {
   importedCount: number;
   skippedCount: number;
@@ -54,10 +57,24 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
+  // Validation & Deployment
+  validation: {
+    status: ValidationStatus;
+    errors: string[];
+    lastValidated: number;
+  };
+  deployment: {
+    status: DeploymentStatus;
+    endpointUrl: string | null;
+  };
+
   // Actions
   setOrgId: (id: string) => void;
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
+  validateGraph: () => void;
+  deployEndpoint: () => void;
+  resetDeployment: () => void;
   
   // Persistence
   saveToOrg: () => void;
@@ -79,21 +96,98 @@ export const useDataStore = create<DataState>((set, get) => ({
   nodes: [],
   edges: [],
 
+  validation: {
+    status: 'idle',
+    errors: [],
+    lastValidated: 0,
+  },
+  deployment: {
+    status: 'idle',
+    endpointUrl: null,
+  },
+
   onNodesChange: (changes: NodeChange[]) => {
-    set({ nodes: applyNodeChanges(changes, get().nodes) });
+    set({ 
+      nodes: applyNodeChanges(changes, get().nodes),
+      validation: { ...get().validation, status: 'idle' } // Reset validation on change
+    });
     get().saveToOrg();
   },
   onEdgesChange: (changes: EdgeChange[]) => {
-    set({ edges: applyEdgeChanges(changes, get().edges) });
+    set({ 
+      edges: applyEdgeChanges(changes, get().edges),
+      validation: { ...get().validation, status: 'idle' }
+    });
     get().saveToOrg();
   },
   onConnect: (connection: Connection) => {
-    set({ edges: addEdge({ ...connection, animated: true }, get().edges) });
+    set({ 
+      edges: addEdge({ ...connection, animated: true }, get().edges),
+      validation: { ...get().validation, status: 'idle' }
+    });
     get().saveToOrg();
   },
   addNode: (node: Node) => {
-    set({ nodes: [...get().nodes, node] });
+    set({ 
+      nodes: [...get().nodes, node],
+      validation: { ...get().validation, status: 'idle' }
+    });
     get().saveToOrg();
+  },
+
+  validateGraph: () => {
+    set({ validation: { ...get().validation, status: 'validating', errors: [] } });
+    
+    // Simulate thinking/scanning
+    setTimeout(() => {
+      const { nodes, edges } = get();
+      const errors: string[] = [];
+
+      if (nodes.length === 0) {
+        errors.push("Graph is empty. Add nodes to define logic.");
+      } else {
+        // 1. Check for orphaned nodes (no connections)
+        nodes.forEach(node => {
+          const hasConnection = edges.some(edge => edge.source === node.id || edge.target === node.id);
+          if (!hasConnection) {
+            errors.push(`Orphaned Node: "${node.data.label}" has no logic paths.`);
+          }
+          if (!node.data.keyId) {
+            errors.push(`Invalid Node: "${node.id}" is missing a KeyId reference.`);
+          }
+        });
+      }
+
+      set({ 
+        validation: { 
+          status: errors.length > 0 ? 'fail' : 'pass', 
+          errors,
+          lastValidated: Date.now()
+        } 
+      });
+    }, 1200);
+  },
+
+  deployEndpoint: () => {
+    const { validation } = get();
+    if (validation.status !== 'pass') return;
+
+    set({ deployment: { status: 'deploying', endpointUrl: null } });
+
+    // Simulate cluster provisioning
+    setTimeout(() => {
+      const mockUrl = `https://api.renderless.io/v1/edge/${get().orgId}/live.json`;
+      set({ 
+        deployment: { 
+          status: 'success', 
+          endpointUrl: mockUrl 
+        } 
+      });
+    }, 2500);
+  },
+
+  resetDeployment: () => {
+    set({ deployment: { status: 'idle', endpointUrl: null } });
   },
 
   setOrgId: (id) => {

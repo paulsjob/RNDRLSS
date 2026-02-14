@@ -12,7 +12,19 @@ import { Button } from '../../shared/components/Button';
 import { useDataStore } from './store/useDataStore';
 
 const NodeCanvasInner: React.FC = () => {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode } = useDataStore();
+  const { 
+    nodes, 
+    edges, 
+    onNodesChange, 
+    onEdgesChange, 
+    onConnect, 
+    addNode, 
+    validation, 
+    validateGraph,
+    deployment,
+    deployEndpoint,
+    resetDeployment
+  } = useDataStore();
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -107,6 +119,7 @@ const NodeCanvasInner: React.FC = () => {
           }
         }
       `}</style>
+      
       <ReactFlow
         nodes={nodeWithData}
         edges={edges}
@@ -122,11 +135,132 @@ const NodeCanvasInner: React.FC = () => {
           maskColor="rgba(0, 0, 0, 0.7)"
           className="bg-zinc-900 border border-zinc-800"
         />
-        <Panel position="top-right" className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={() => alert('Logic validated against mock feed.')}>Validate Graph</Button>
-          <Button size="sm" variant="primary">Deploy Endpoint</Button>
+        
+        <Panel position="top-right" className="flex flex-col gap-3">
+          <div className="flex gap-2 bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-xl border border-zinc-800 shadow-2xl">
+            <Button 
+              size="sm" 
+              variant={validation.status === 'pass' ? 'secondary' : 'primary'} 
+              onClick={validateGraph}
+              disabled={validation.status === 'validating'}
+              className="px-4 py-2 font-black uppercase tracking-widest text-[10px]"
+            >
+              {validation.status === 'validating' ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                  Validating...
+                </div>
+              ) : 'Validate Graph'}
+            </Button>
+            <Button 
+              size="sm" 
+              variant="primary" 
+              onClick={deployEndpoint}
+              disabled={validation.status !== 'pass' || deployment.status !== 'idle'}
+              className={`px-6 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${
+                validation.status === 'pass' 
+                  ? 'bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.4)]' 
+                  : 'bg-zinc-800 text-zinc-600'
+              }`}
+            >
+              Deploy Endpoint
+            </Button>
+          </div>
+
+          {/* Validation Report UI */}
+          {validation.status !== 'idle' && (
+            <div className={`animate-in slide-in-from-top-4 duration-300 p-3 rounded-xl border flex flex-col gap-2 shadow-xl ${
+              validation.status === 'pass' ? 'bg-green-500/10 border-green-500/30' : 
+              validation.status === 'fail' ? 'bg-red-500/10 border-red-500/30' : 'bg-blue-500/10 border-blue-500/30'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  validation.status === 'pass' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 
+                  validation.status === 'fail' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-blue-500 animate-pulse'
+                }`}></div>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${
+                  validation.status === 'pass' ? 'text-green-400' : 
+                  validation.status === 'fail' ? 'text-red-400' : 'text-blue-400'
+                }`}>
+                  {validation.status === 'pass' ? 'System Validated' : 
+                   validation.status === 'fail' ? 'Integrity Errors' : 'Scanning Topology...'}
+                </span>
+              </div>
+              {validation.errors.length > 0 && (
+                <div className="space-y-1.5 mt-1">
+                  {validation.errors.map((err, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[9px] text-zinc-400 font-bold uppercase leading-relaxed">
+                      <span className="text-red-500 mt-0.5 shrink-0">•</span>
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Panel>
       </ReactFlow>
+
+      {/* Deployment Overlays */}
+      {deployment.status !== 'idle' && (
+        <div className="absolute inset-0 z-[100] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-500">
+          <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] p-10 text-center animate-in zoom-in-95 duration-300">
+            {deployment.status === 'deploying' ? (
+              <div className="space-y-8">
+                <div className="relative w-20 h-20 mx-auto">
+                  <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400"><path d="M12 2v8"/><path d="m16 6-4 4-4-4"/></svg>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black text-white uppercase tracking-widest">Provisioning Edge</h3>
+                  <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Deploying logical graph to Cluster Alpha...</p>
+                </div>
+                <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                   <div className="h-full bg-blue-500 animate-[progress_2s_ease-in-out_infinite]"></div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="w-20 h-20 mx-auto bg-green-500 rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(34,197,94,0.3)]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white animate-[check_0.4s_ease-out]"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-widest leading-none">Endpoint Live</h3>
+                  <p className="text-xs text-green-500 font-black uppercase tracking-widest">Global Edge Distribution Complete</p>
+                </div>
+                
+                <div className="bg-black/50 border border-zinc-800 rounded-2xl p-5 space-y-3 shadow-inner">
+                  <span className="text-[9px] text-zinc-600 font-black uppercase tracking-widest block text-left">Production Endpoint URL</span>
+                  <div className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-xl">
+                    <span className="text-[11px] font-mono text-blue-400 truncate">{deployment.endpointUrl}</span>
+                    <button className="text-zinc-500 hover:text-white transition-colors shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <Button variant="secondary" size="lg" onClick={resetDeployment} className="w-full h-12 font-black uppercase tracking-[0.2em] text-[11px] rounded-2xl border-2 border-zinc-800">
+                  Return to Canvas
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes progress {
+          0% { width: 0; }
+          100% { width: 100%; }
+        }
+        @keyframes check {
+          0% { transform: scale(0.5); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 };
