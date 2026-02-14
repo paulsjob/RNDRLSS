@@ -84,11 +84,6 @@ interface DataState {
     filterType: 'all' | 'pinned' | 'recent';
   };
 
-  // Golden Demo Coach (ITEM 34)
-  demoCoach: {
-    isDismissed: boolean;
-  };
-
   // Golden Path Demo State
   goldenPath: {
     sourceMode: SourceMode;
@@ -129,6 +124,11 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
+  // ADD: Missing state for DataEngineView workflow coach
+  demoCoach: {
+    isDismissed: boolean;
+  };
+
   validation: {
     status: 'idle' | 'validating' | 'pass' | 'fail';
     results: ValidationResult[];
@@ -154,6 +154,9 @@ interface DataState {
   // Flow Actions (ITEM 40)
   registerNodeActivity: (nodeId: string) => void;
 
+  // ADD: Missing action to manage coach visibility
+  setCoachDismissed: (isDismissed: boolean) => void;
+
   // Setup/Mode Actions (Secondary)
   setSimMode: (mode: SimMode, scenarioId?: string | null) => void;
   startDemoPipeline: () => void;
@@ -173,8 +176,6 @@ interface DataState {
   setMonitorSearch: (query: string) => void;
   setMonitorFilter: (filter: 'all' | 'pinned' | 'recent') => void;
 
-  // Demo Coach Actions
-  setCoachDismissed: (dismissed: boolean) => void;
   resetDemo: () => void;
 
   // Actions
@@ -235,10 +236,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     filterType: 'all',
   },
 
-  demoCoach: {
-    isDismissed: false,
-  },
-
   goldenPath: {
     sourceMode: 'demo',
     rawInput: '0',
@@ -266,6 +263,12 @@ export const useDataStore = create<DataState>((set, get) => ({
   isLoading: false,
   nodes: [],
   edges: [],
+
+  // FIX: Initialize demoCoach state
+  demoCoach: {
+    isDismissed: false
+  },
+
   validation: {
     status: 'idle',
     results: [],
@@ -287,6 +290,11 @@ export const useDataStore = create<DataState>((set, get) => ({
         tickCount: (state.nodeActivity[nodeId]?.tickCount || 0) + 1
       }
     }
+  })),
+
+  // FIX: Implement setCoachDismissed action
+  setCoachDismissed: (isDismissed) => set(state => ({
+    demoCoach: { ...state.demoCoach, isDismissed }
   })),
 
   transportStart: () => {
@@ -354,8 +362,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     });
   },
 
-  setCoachDismissed: (isDismissed) => set({ demoCoach: { isDismissed } }),
-
   resetDemo: () => {
     get().stopAll();
     set({
@@ -367,7 +373,8 @@ export const useDataStore = create<DataState>((set, get) => ({
       demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
       goldenPath: { ...get().goldenPath, isBound: false, error: null },
       simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null },
-      nodeActivity: {}
+      nodeActivity: {},
+      demoCoach: { isDismissed: false }
     });
   },
 
@@ -614,7 +621,7 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   setBusState: (busState) => set({ busState }),
   setWiringMode: (active, source = null) => set({ isWiringMode: active, activeWiringSource: source }),
-  setTruthMode: (isTruthMode) => set({ isTruthMode, isWiringMode: false, activeWiringSource: null }),
+  setTruthMode: (active) => set({ isTruthMode: active, isWiringMode: false, activeWiringSource: null }),
   setTraceId: (selectedTraceId) => set({ selectedTraceId }),
 
   onNodesChange: (changes: NodeChange[]) => {

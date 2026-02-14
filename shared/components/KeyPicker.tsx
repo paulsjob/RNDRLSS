@@ -6,6 +6,9 @@ interface KeyPickerProps {
   dictionaries: Dictionary[];
   selectedKeyId: string | null;
   onSelect: (keyId: string) => void;
+  onQuickBind?: (keyId: string) => void;
+  // FIX: Added onSearchChange to propagate search query to parent
+  onSearchChange?: (query: string) => void;
   className?: string;
   filterKind?: KeyKind;
   recommendedKeyIds?: string[];
@@ -15,6 +18,8 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
   dictionaries, 
   selectedKeyId, 
   onSelect,
+  onQuickBind,
+  onSearchChange,
   className = "",
   filterKind,
   recommendedKeyIds = []
@@ -63,6 +68,12 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
     [allKeys, selectedKeyId]
   );
 
+  // FIX: Wrap search state updates to also notify parent
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    onSearchChange?.(val);
+  };
+
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       <div className="flex gap-2">
@@ -71,7 +82,7 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
             type="text" 
             placeholder="Search keys..." 
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full bg-black border border-zinc-800 rounded px-3 py-2 text-xs text-zinc-200 focus:border-blue-500 outline-none pr-8 placeholder:text-zinc-700 font-medium"
           />
           <div className="absolute right-3 top-2.5 text-zinc-600">
@@ -93,34 +104,47 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
       <div className="max-h-[260px] overflow-y-auto border border-zinc-800 rounded bg-black/40 scrollbar-thin scrollbar-thumb-zinc-800">
         {filteredKeys.length > 0 ? (
           filteredKeys.map(k => (
-            <button
+            <div
               key={`${k.dictId}-${k.keyId}`}
-              onClick={() => onSelect(k.keyId)}
-              className={`w-full text-left px-3 py-2.5 hover:bg-zinc-800 flex flex-col transition-all border-l-2 relative overflow-hidden group ${selectedKeyId === k.keyId ? 'border-blue-500 bg-blue-500/5' : 'border-transparent'}`}
+              className={`w-full text-left flex items-center group transition-all border-l-2 relative overflow-hidden ${selectedKeyId === k.keyId ? 'border-blue-500 bg-blue-500/5' : 'border-transparent hover:bg-zinc-800'}`}
             >
-              <div className="flex justify-between items-center z-10">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-bold tracking-tight ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
-                    {k.alias}
+              <button
+                onClick={() => onSelect(k.keyId)}
+                className="flex-1 text-left px-3 py-2.5 flex flex-col z-10 outline-none"
+              >
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-bold tracking-tight ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
+                      {k.alias}
+                    </span>
+                    {k.isRecommended && (
+                      <span className="text-[7px] bg-blue-600/20 text-blue-400 px-1 rounded-sm border border-blue-500/30 font-black tracking-widest uppercase animate-pulse">Rec</span>
+                    )}
+                  </div>
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter shadow-sm ${k.isBuiltin ? 'bg-blue-900/40 text-blue-500 border border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
+                    {k.dictName}
                   </span>
-                  {k.isRecommended && (
-                    <span className="text-[7px] bg-blue-600/20 text-blue-400 px-1 rounded-sm border border-blue-500/30 font-black tracking-widest uppercase animate-pulse">Rec</span>
-                  )}
                 </div>
-                <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter shadow-sm ${k.isBuiltin ? 'bg-blue-900/40 text-blue-500 border border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
-                  {k.dictName}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-1 z-10">
-                <span className="text-[9px] text-zinc-600 font-mono truncate">{k.canonicalPath || k.path}</span>
-                {k.tags?.slice(0, 1).map(t => (
-                  <span key={t} className="text-[7px] text-zinc-700 uppercase font-black">#{t}</span>
-                ))}
-              </div>
+                <div className="flex items-center gap-2 mt-1 z-10">
+                  <span className="text-[9px] text-zinc-600 font-mono truncate">{k.canonicalPath || k.path}</span>
+                </div>
+              </button>
+
+              {onQuickBind && k.isRecommended && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onQuickBind(k.keyId); }}
+                  className="mr-3 p-1.5 rounded-lg bg-blue-600/10 text-blue-400 opacity-0 group-hover:opacity-100 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/20 flex items-center gap-1.5"
+                  title="Bind Instantly"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m13 2-2 10h7L11 22l2-10H6L13 2z"/></svg>
+                  <span className="text-[8px] font-black uppercase tracking-widest pr-1">Quick</span>
+                </button>
+              )}
+
               {selectedKeyId === k.keyId && (
                 <div className="absolute inset-y-0 left-0 w-1 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
               )}
-            </button>
+            </div>
           ))
         ) : (
           <div className="p-8 text-center flex flex-col items-center gap-2">
