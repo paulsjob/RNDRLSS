@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { DataDictionaryBrowser } from './DataDictionaryBrowser';
 import { NodeCanvas } from './NodeCanvas';
 import { LiveMonitor } from './components/LiveMonitor';
@@ -9,21 +10,127 @@ import { GoldenPathPanel } from './components/GoldenPathPanel';
 import { PipelineVisualizer } from './components/PipelineVisualizer';
 import { Button } from '../../shared/components/Button';
 
+/**
+ * ITEM 34: Golden Demo Coach Overlay
+ */
+const GoldenDemoCoach: React.FC = () => {
+  const { simController, selection, validation, isTruthMode, resetDemo, demoCoach, setCoachDismissed } = useDataStore();
+  
+  const currentStep = useMemo(() => {
+    if (simController.status === 'idle') return 1;
+    if (selection.id === null) return 2;
+    if (validation.status !== 'pass') return 3;
+    if (!isTruthMode) return 4;
+    return 5;
+  }, [simController.status, selection.id, validation.status, isTruthMode]);
+
+  const steps = [
+    { id: 1, label: 'Initiate Pipeline', desc: 'Click "Run Demo" to start simulation.', completed: currentStep > 1 },
+    { id: 2, label: 'Audit Source', desc: 'Select a key from the Dictionary list.', completed: currentStep > 2 },
+    { id: 3, label: 'Verify Logic', desc: 'Run "Validate" to check path integrity.', completed: currentStep > 3 },
+    { id: 4, label: 'Proof Reality', desc: 'Toggle "Truth Mode" for diagnostics.', completed: currentStep > 4 },
+  ];
+
+  if (demoCoach.isDismissed) return null;
+
+  return (
+    <div className="fixed bottom-10 left-10 z-[200] w-72 bg-black/80 backdrop-blur-xl border border-blue-500/30 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+      <div className="p-5 border-b border-white/5 flex items-center justify-between bg-blue-600/10">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></div>
+          <span className="text-[10px] font-black text-blue-100 uppercase tracking-widest">Workflow Master</span>
+        </div>
+        <button onClick={() => setCoachDismissed(true)} className="text-zinc-600 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+
+      <div className="p-6 space-y-6">
+        <div className="space-y-1">
+          <h4 className="text-[11px] font-black text-white uppercase tracking-widest">Golden Demo Loop</h4>
+          <p className="text-[9px] text-zinc-500 uppercase font-bold leading-relaxed">Follow the steps to master the pipeline.</p>
+        </div>
+
+        <div className="space-y-4">
+          {steps.map(step => (
+            <div key={step.id} className={`flex items-start gap-4 transition-all duration-300 ${step.completed ? 'opacity-40' : currentStep === step.id ? 'opacity-100 scale-[1.02]' : 'opacity-20'}`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all ${step.completed ? 'bg-blue-600 border-blue-600 text-white' : currentStep === step.id ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] text-blue-400' : 'border-zinc-800 text-zinc-700'}`}>
+                {step.completed ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                ) : (
+                  <span className="text-[9px] font-black">{step.id}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className={`text-[10px] font-black uppercase tracking-tight ${step.completed ? 'text-zinc-400 line-through' : currentStep === step.id ? 'text-white' : 'text-zinc-600'}`}>{step.label}</span>
+                {currentStep === step.id && (
+                  <span className="text-[9px] text-blue-400/80 font-bold leading-tight animate-in fade-in slide-in-from-left-1">{step.desc}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {currentStep === 5 && (
+          <div className="bg-green-600/20 border border-green-500/30 p-3 rounded-xl animate-in zoom-in-95 duration-500">
+             <span className="text-[9px] font-black text-green-400 uppercase tracking-widest flex items-center gap-2">
+               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+               Workflow Mastery Confirmed
+             </span>
+          </div>
+        )}
+
+        <button 
+          onClick={resetDemo}
+          className="w-full py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-[9px] font-black text-zinc-500 hover:text-white hover:border-zinc-700 transition-all uppercase tracking-[0.2em]"
+        >
+          Reset Demo
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const PipelineHeader: React.FC = () => {
   const { 
-    simController,
+    activeAdapterId, 
+    availableAdapters, 
+    simController, 
     busState, 
     isTruthMode, 
     setTruthMode, 
     startDemoPipeline,
-    nodes
+    nodes,
+    selection,
+    validation
   } = useDataStore();
 
   const isSimRunning = simController.status === 'running';
   const isSimPaused = simController.status === 'paused';
 
+  // ITEM 34: Derived step for highlighting
+  const currentStep = useMemo(() => {
+    if (simController.status === 'idle') return 1;
+    if (selection.id === null) return 2;
+    if (validation.status !== 'pass') return 3;
+    if (!isTruthMode) return 4;
+    return 5;
+  }, [simController.status, selection.id, validation.status, isTruthMode]);
+
   return (
     <div className={`h-12 border-b flex items-center justify-between px-6 shrink-0 z-[70] transition-colors duration-500 ${isTruthMode ? 'bg-zinc-950 border-blue-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
+      <style>{`
+        @keyframes subtle-pulse-blue {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+          50% { box-shadow: 0 0 15px 2px rgba(59, 130, 246, 0.4); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .highlight-guide {
+          animation: subtle-pulse-blue 2s infinite ease-in-out;
+          border-color: rgba(59, 130, 246, 0.6) !important;
+        }
+      `}</style>
+      
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-3">
           <div className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest transition-all ${isTruthMode ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
@@ -61,8 +168,11 @@ const PipelineHeader: React.FC = () => {
            <span className="text-[10px] font-mono font-bold text-blue-400">{nodes.length} Nodes</span>
         </div>
 
-        {/* Truth Mode Toggle */}
-        <div className="flex items-center gap-3 px-4 py-1.5 bg-black border border-zinc-800 rounded-full group cursor-pointer hover:border-blue-500/50 transition-all" onClick={() => setTruthMode(!isTruthMode)}>
+        {/* Truth Mode Toggle (Step 4 Highlight) */}
+        <div 
+          className={`flex items-center gap-3 px-4 py-1.5 bg-black border border-zinc-800 rounded-full group cursor-pointer hover:border-blue-500/50 transition-all ${currentStep === 4 ? 'highlight-guide' : ''}`} 
+          onClick={() => setTruthMode(!isTruthMode)}
+        >
            <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isTruthMode ? 'text-blue-400' : 'text-zinc-600'}`}>Truth Mode</span>
            <div className={`w-8 h-4 rounded-full relative transition-all ${isTruthMode ? 'bg-blue-600' : 'bg-zinc-800'}`}>
               <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${isTruthMode ? 'left-4.5' : 'left-0.5 shadow-sm'}`}></div>
@@ -173,6 +283,8 @@ export const DataEngineView: React.FC = () => {
           <LiveMonitor />
         </div>
       </div>
+
+      <GoldenDemoCoach />
     </div>
   );
 };

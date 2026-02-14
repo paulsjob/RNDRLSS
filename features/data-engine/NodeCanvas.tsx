@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ReactFlow, 
@@ -49,6 +50,15 @@ const NodeCanvasInner: React.FC = () => {
   } = useDataStore();
 
   const [bindingConfirmation, setBindingConfirmation] = useState<string | null>(null);
+
+  // ITEM 34: Derived step for highlighting
+  const currentStep = useMemo(() => {
+    if (simController.status === 'idle') return 1;
+    if (selection.id === null) return 2;
+    if (validation.status !== 'pass') return 3;
+    if (!isTruthMode) return 4;
+    return 5;
+  }, [simController.status, selection.id, validation.status, isTruthMode]);
 
   const onDrop = (event: React.DragEvent) => {
     if (isTruthMode) return;
@@ -215,7 +225,7 @@ const NodeCanvasInner: React.FC = () => {
         <Controls className="bg-zinc-900 border-zinc-800 fill-white" />
         
         <Panel position="top-right" className={`flex flex-col gap-3 max-w-[280px] transition-all duration-500 ${isTruthMode ? 'opacity-30 blur-[2px] pointer-events-none' : ''}`}>
-          <div className="flex flex-col gap-2 bg-zinc-900/90 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden relative">
+          <div className={`flex flex-col gap-2 bg-zinc-900/90 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden relative transition-all ${currentStep === 3 ? 'highlight-guide' : ''}`}>
             <div className="flex items-center justify-between mb-2">
                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Logic Health</h4>
                <div className="flex items-center gap-1">
@@ -229,7 +239,7 @@ const NodeCanvasInner: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-              <Button size="sm" variant={validation.status === 'pass' ? 'secondary' : 'primary'} onClick={validateGraph} disabled={validation.status === 'validating'} className="flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px]">
+              <Button size="sm" variant={validation.status === 'pass' ? 'secondary' : 'primary'} onClick={validateGraph} disabled={validation.status === 'validating'} className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] ${currentStep === 3 ? 'bg-blue-600 text-white' : ''}`}>
                 {validation.status === 'validating' ? 'Scanning...' : 'Validate'}
               </Button>
               <Button size="sm" variant="primary" onClick={deployEndpoint} disabled={validation.status !== 'pass' || deployment.status !== 'idle'} className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${validation.status === 'pass' ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-zinc-800 text-zinc-600'}`}>

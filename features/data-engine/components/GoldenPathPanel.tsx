@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useDataStore, SourceMode } from '../store/useDataStore';
 import { useStudioStore } from '../../studio/store/useStudioStore';
 import { Button } from '../../../shared/components/Button';
@@ -12,11 +13,23 @@ export const GoldenPathPanel: React.FC = () => {
     validateGoldenPath,
     simController,
     startDemoPipeline,
-    bindToGraphic
+    bindToGraphic,
+    selection,
+    validation,
+    isTruthMode
   } = useDataStore();
 
   const [isDemoBinding, setIsDemoBinding] = useState(false);
   
+  // Derived step for highlighting
+  const currentStep = useMemo(() => {
+    if (simController.status === 'idle') return 1;
+    if (selection.id === null) return 2;
+    if (validation.status !== 'pass') return 3;
+    if (!isTruthMode) return 4;
+    return 5;
+  }, [simController.status, selection.id, validation.status, isTruthMode]);
+
   const handleLaunchDemo = () => {
     setIsDemoBinding(true);
     
@@ -45,7 +58,7 @@ export const GoldenPathPanel: React.FC = () => {
       <div className="p-6 pt-12 space-y-8 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
         
         {/* DEMO CTA */}
-        <section className="bg-blue-600/5 p-6 rounded-[2.5rem] border border-blue-500/20 shadow-2xl relative overflow-hidden group">
+        <section className={`bg-blue-600/5 p-6 rounded-[2.5rem] border border-blue-500/20 shadow-2xl relative overflow-hidden group transition-all duration-500 ${currentStep === 1 ? 'highlight-guide scale-[1.02]' : ''}`}>
            <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse"></div>
            <div className="relative z-10 space-y-4">
               <div className="flex items-center justify-between">

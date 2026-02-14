@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { 
   Connection, 
@@ -57,6 +58,11 @@ interface DataState {
     id: string | null;
     label: string | null;
     canonicalPath: string | null;
+  };
+
+  // Golden Demo Coach (ITEM 34)
+  demoCoach: {
+    isDismissed: boolean;
   };
 
   // Golden Path Demo State
@@ -124,6 +130,10 @@ interface DataState {
   // Selection Actions
   setSelection: (kind: SelectionKind | null, id: string | null, label?: string, path?: string) => void;
 
+  // Demo Coach Actions
+  setCoachDismissed: (dismissed: boolean) => void;
+  resetDemo: () => void;
+
   // Actions
   setGoldenPathSource: (mode: SourceMode) => void;
   updateRawInput: (val: string) => void;
@@ -172,6 +182,10 @@ export const useDataStore = create<DataState>((set, get) => ({
     canonicalPath: null,
   },
 
+  demoCoach: {
+    isDismissed: false,
+  },
+
   goldenPath: {
     sourceMode: 'demo',
     rawInput: '0',
@@ -183,7 +197,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   demoPipeline: {
-    timer: 900, // 15 mins in seconds
+    timer: 900,
     homeScore: 3,
     awayScore: 1
   },
@@ -220,6 +234,20 @@ export const useDataStore = create<DataState>((set, get) => ({
         canonicalPath: path || null 
       },
       selectedTraceId: id 
+    });
+  },
+
+  setCoachDismissed: (isDismissed) => set({ demoCoach: { isDismissed } }),
+
+  resetDemo: () => {
+    get().stopAll();
+    set({
+      selection: { kind: null, id: null, label: null, canonicalPath: null },
+      validation: { status: 'idle', errors: [], lastValidated: 0, offendingNodeIds: new Set() },
+      isTruthMode: false,
+      selectedTraceId: null,
+      demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
+      goldenPath: { ...get().goldenPath, isBound: false, error: null }
     });
   },
 

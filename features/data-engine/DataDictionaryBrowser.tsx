@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDataStore, getProvenance, Provenance } from './store/useDataStore';
 import { resolvePath, normalizeValue } from './engine-logic';
@@ -49,11 +50,22 @@ export const DataDictionaryBrowser: React.FC = () => {
     isTruthMode,
     selection,
     setSelection,
-    setWiringMode
+    setWiringMode,
+    simController,
+    validation
   } = useDataStore();
   
   const [search, setSearch] = useState('');
   const [hoveredKey, setHoveredKey] = useState<{ key: DictionaryKey; x: number; y: number } | null>(null);
+
+  // ITEM 34: Derived step for highlighting
+  const currentStep = useMemo(() => {
+    if (simController.status === 'idle') return 1;
+    if (selection.id === null) return 2;
+    if (validation.status !== 'pass') return 3;
+    if (!isTruthMode) return 4;
+    return 5;
+  }, [simController.status, selection.id, validation.status, isTruthMode]);
 
   useEffect(() => {
     const interval = setInterval(refreshSnapshot, 5000);
@@ -80,7 +92,7 @@ export const DataDictionaryBrowser: React.FC = () => {
   }, [allDictionaries, search]);
 
   return (
-    <div className={`w-[320px] h-full border-r flex flex-col shrink-0 relative transition-colors duration-500 ${isTruthMode ? 'bg-black border-blue-900/40' : 'bg-zinc-900 border-zinc-800'}`}>
+    <div className={`w-[320px] h-full border-r flex flex-col shrink-0 relative transition-all duration-500 ${isTruthMode ? 'bg-black border-blue-900/40' : 'bg-zinc-900 border-zinc-800'} ${currentStep === 2 ? 'ring-inset ring-1 ring-blue-500/30 bg-blue-500/5' : ''}`}>
       {/* Flow Indicator */}
       <div className="absolute top-3 left-4 z-10 pointer-events-none">
         <div className={`flex items-center gap-2 px-2 py-1 border rounded-md backdrop-blur-md transition-all ${isTruthMode ? 'bg-blue-600/10 border-blue-500 text-blue-400' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-500'}`}>
@@ -111,7 +123,7 @@ export const DataDictionaryBrowser: React.FC = () => {
             placeholder="Filter reality registry..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`w-full bg-black border rounded px-3 py-2 text-xs focus:border-blue-500 outline-none pr-8 transition-colors ${isTruthMode ? 'border-blue-900/40 text-blue-100 placeholder:text-blue-900' : 'border-zinc-800 text-zinc-300'}`}
+            className={`w-full bg-black border rounded px-3 py-2 text-xs focus:border-blue-500 outline-none pr-8 transition-colors ${isTruthMode ? 'border-blue-900/40 text-blue-100 placeholder:text-blue-900' : 'border-zinc-800 text-zinc-300'} ${currentStep === 2 ? 'highlight-guide' : ''}`}
           />
         </div>
       </div>
@@ -133,7 +145,7 @@ export const DataDictionaryBrowser: React.FC = () => {
                   <div 
                     key={key.keyId}
                     draggable={!isTruthMode}
-                    onClick={() => setSelection('key', key.keyId, key.alias, key.canonicalPath)}
+                    onClick={() => isTruthMode && setSelection('key', key.keyId, key.alias, key.canonicalPath)}
                     onDragStart={(e) => {
                       if (isTruthMode) return;
                       e.dataTransfer.setData('application/renderless-field', JSON.stringify(key));
@@ -148,7 +160,7 @@ export const DataDictionaryBrowser: React.FC = () => {
                       isSelected ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.2)] z-10' : 
                       isTruthMode ? 'border-transparent hover:bg-blue-500/5 hover:border-blue-900/30' : 
                       'border-transparent hover:bg-zinc-800 hover:border-zinc-700/50'
-                    }`}
+                    } ${currentStep === 2 ? 'hover:border-blue-400/40' : ''}`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2 overflow-hidden">
