@@ -249,19 +249,20 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     
     let width, height, x, y;
     
-    // Requirement: If exactly 1920x1080 and canvas is 1920x1080, fill frame
-    if (iw === 1920 && ih === 1080 && cw === 1920 && ch === 1080) {
-      width = 1920;
-      height = 1080;
+    // GOAL 2: Correct initial image sizing
+    // If exactly 1920x1080 (Broadcast) or matches stage resolution, fill viewport
+    if ((iw === 1920 && ih === 1080) || (iw === cw && ih === ch)) {
+      width = cw;
+      height = ch;
       x = 0;
       y = 0;
     } else {
-      // Requirement: Otherwise, fit within 80% of canvas width/height preserving aspect ratio
-      const maxW = cw * 0.8;
-      const maxH = ch * 0.8;
-      const scale = Math.min(maxW / iw, maxH / ih);
-      width = iw * scale;
-      height = ih * scale;
+      // Fit to stage preserving aspect ratio, with 60% of stage width as max size
+      const maxW = cw * 0.6;
+      const maxH = ch * 0.6;
+      const scaleToFit = Math.min(maxW / iw, maxH / ih);
+      width = iw * scaleToFit;
+      height = ih * scaleToFit;
       x = (cw - width) / 2;
       y = (ch - height) / 2;
     }

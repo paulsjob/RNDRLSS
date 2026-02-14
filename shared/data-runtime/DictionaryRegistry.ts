@@ -27,7 +27,8 @@ class DictionaryRegistry {
 
   public subscribe(cb: () => void) {
     this.listeners.add(cb);
-    return () => this.listeners.delete(cb);
+    // Fix: Wrap in block to return void instead of boolean (required for React cleanup functions)
+    return () => { this.listeners.delete(cb); };
   }
 
   private notify() {

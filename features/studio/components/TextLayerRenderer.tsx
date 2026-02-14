@@ -30,6 +30,9 @@ interface TextLayerRendererProps {
  * Handles display and in-situ editing with pixel-perfect alignment.
  */
 export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, scale }) => {
+  // Fix: Move type guard to the top to narrow Layer type to TextLayer for safe content property access throughout the component
+  if (layer.type !== LayerType.TEXT) return null;
+
   const { ui, selection, setEditingLayerId, updateLayerContent, currentTemplate } = useStudioStore();
   const bindings = currentTemplate?.bindings || {};
   
@@ -124,8 +127,6 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
       setEditingLayerId(layer.id);
     }
   };
-
-  if (layer.type !== LayerType.TEXT) return null;
 
   // Shared typography styles to prevent "jumps" during transition
   const typoStyles: React.CSSProperties = {

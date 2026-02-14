@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { useAssetStore, Asset } from '../../store/useAssetStore';
 import { useStudioStore } from '../../store/useStudioStore';
 import { Button } from '../../../../shared/components/Button';
@@ -20,6 +21,44 @@ export const QuickAssets: React.FC = () => {
     setFilterType 
   } = useAssetStore();
   const { addAssetLayer } = useStudioStore();
+
+  // GOAL 1: Drag-and-drop from Asset Library to stage
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      // Only allow drop if it's our internal asset type
+      if (e.dataTransfer?.types.includes('application/renderless-asset')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      const data = e.dataTransfer?.getData('application/renderless-asset');
+      if (!data) return;
+
+      e.preventDefault();
+      try {
+        const asset = JSON.parse(data);
+        
+        // Safety check: Don't drop on sidebars or headers
+        const target = e.target as HTMLElement;
+        const isProtectedArea = target.closest('.w-64') || target.closest('.w-80') || target.closest('header');
+        
+        if (!isProtectedArea) {
+          addAssetLayer(asset);
+        }
+      } catch (err) {
+        console.error('[QuickAssets] Global drop failed', err);
+      }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [addAssetLayer]);
 
   const filteredAssets = assets.filter(a => {
     const isChild = a.parentId === currentFolderId;
@@ -112,6 +151,11 @@ export const QuickAssets: React.FC = () => {
             {filteredAssets.map(asset => (
               <div 
                 key={asset.id}
+                draggable={asset.type !== 'folder'}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/renderless-asset', JSON.stringify(asset));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
                 onClick={() => handleAssetClick(asset)}
                 className={`group flex rounded-lg cursor-pointer transition-all border border-transparent ${
                   quickViewMode === 'grid' 
@@ -132,7 +176,7 @@ export const QuickAssets: React.FC = () => {
                     <AssetContextMenu 
                       asset={asset}
                       trigger={
-                        <button className="p-1 opacity-0 group-hover:opacity-100 hover:text-white transition-all">
+                        <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all">
                           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                         </button>
                       }
@@ -148,7 +192,7 @@ export const QuickAssets: React.FC = () => {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-zinc-700 px-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-20"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
-            <p className="text-[10px] uppercase font-bold tracking-widest opacity-40 leading-relaxed">No {filterType} found</p>
+            <p className="text-[10px] uppercase font-bold tracking-widest opacity-40 leading-relaxed">No items match filters</p>
           </div>
         )}
       </div>

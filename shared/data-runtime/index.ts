@@ -107,7 +107,8 @@ class LiveBus {
   // useSyncExternalStore compatible subscribe
   public subscribe = (callback: GlobalSubscriber): () => void => {
     this.globalSubscribers.add(callback);
-    return () => this.globalSubscribers.delete(callback);
+    // Fix: Explicitly return void from cleanup to avoid returning the boolean result of delete
+    return () => { this.globalSubscribers.delete(callback); };
   };
 
   public subscribeToKey(keyId: KeyId, cb: LiveBusSubscriber): () => void {

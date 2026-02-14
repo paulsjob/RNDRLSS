@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAssetStore, Asset } from '../../store/useAssetStore';
 import { useStudioStore } from '../../store/useStudioStore';
@@ -95,6 +96,11 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                  {currentAssets.map(asset => (
                    <div 
                      key={asset.id}
+                     draggable={asset.type !== 'folder'}
+                     onDragStart={(e) => {
+                       e.dataTransfer.setData('application/renderless-asset', JSON.stringify(asset));
+                       e.dataTransfer.effectAllowed = 'copy';
+                     }}
                      onClick={() => handleAssetClick(asset)}
                      className="group flex flex-col items-center gap-4 p-5 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300 relative"
                    >
@@ -126,6 +132,11 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                   {currentAssets.map(asset => (
                     <div 
                       key={asset.id}
+                      draggable={asset.type !== 'folder'}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/renderless-asset', JSON.stringify(asset));
+                        e.dataTransfer.effectAllowed = 'copy';
+                      }}
                       onClick={() => handleAssetClick(asset)}
                       className="flex items-center justify-between p-4 rounded-xl bg-zinc-900/20 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 group cursor-pointer transition-all"
                     >

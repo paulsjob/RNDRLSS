@@ -54,17 +54,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           </div>
           <h2 className="text-xl font-bold text-zinc-100 mb-2">Feature Unavailable</h2>
           <p className="text-sm text-zinc-500 text-center max-w-md mb-8">
-            {/* FIX: Using this.props correctly through explicit Component inheritance. */}
             The <span className="text-zinc-300 font-mono">{this.props.featureName || 'requested feature'}</span> encountered a critical error and had to be suspended.
           </p>
-          <div className="bg-black/50 border border-zinc-800 rounded-lg p-4 w-full max-w-xl mb-8 overflow-hidden">
+          <div className="bg-black/50 border border-zinc-800 rounded-lg p-4 w-full max-w-xl mb-8 overflow-hidden text-left">
             <p className="text-[10px] font-mono text-red-400 truncate">
               {this.state.error?.message || 'Unknown Execution Error'}
             </p>
           </div>
           <button 
             onClick={this.handleReset}
-            className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-zinc-700 active:scale-95"
+            className="bg-zinc-800 hover:bg-zinc-700 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all border border-zinc-700 active:scale-95 shadow-lg"
           >
             Reset Component
           </button>
@@ -72,7 +71,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       );
     }
 
-    // FIX: Using this.props correctly through explicit Component inheritance.
     return this.props.children;
   }
 }

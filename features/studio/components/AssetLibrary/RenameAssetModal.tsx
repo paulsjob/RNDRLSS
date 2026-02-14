@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAssetStore } from '../../store/useAssetStore';
 import { Button } from '../../../../shared/components/Button';
@@ -57,7 +58,7 @@ export const RenameAssetModal: React.FC = () => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full bg-black border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none transition-all"
+            className="w-full bg-black border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-white focus:border-blue-500 outline-none transition-all shadow-inner"
           />
 
           <div className="flex gap-3">
