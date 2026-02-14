@@ -182,36 +182,48 @@ const PipelineHeader: React.FC = () => {
 
 export const DataEngineView: React.FC = () => {
   const { isTruthMode } = useDataStore();
+  
+  // ITEM 43: Refactored Resizable Monitor Logic
   const [monitorWidth, setMonitorWidth] = useState(() => {
     const saved = localStorage.getItem('renderless:ui:monitor-width');
     return saved ? parseInt(saved, 10) : 420;
   });
+  
   const isResizing = useRef(false);
 
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', stopResizing);
     document.body.style.cursor = 'col-resize';
-  }, []);
+    document.body.style.userSelect = 'none';
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizing.current) return;
+      const newWidth = window.innerWidth - moveEvent.clientX;
+      const minWidth = 320;
+      const maxWidth = Math.min(800, window.innerWidth * 0.45);
+      
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
+        setMonitorWidth(newWidth);
+      }
+    };
 
-  const stopResizing = useCallback(() => {
-    isResizing.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', stopResizing);
-    document.body.style.cursor = 'default';
-    localStorage.setItem('renderless:ui:monitor-width', monitorWidth.toString());
-  }, [monitorWidth]);
+    const stopResizing = () => {
+      isResizing.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', stopResizing);
+      
+      // Persist only on finish
+      setMonitorWidth(prev => {
+        localStorage.setItem('renderless:ui:monitor-width', prev.toString());
+        return prev;
+      });
+    };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing.current) return;
-    const newWidth = window.innerWidth - e.clientX;
-    const minWidth = 300;
-    const maxWidth = Math.min(800, window.innerWidth * 0.45);
-    if (newWidth >= minWidth && newWidth <= maxWidth) {
-      setMonitorWidth(newWidth);
-    }
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', stopResizing);
   }, []);
 
   return (
@@ -221,7 +233,7 @@ export const DataEngineView: React.FC = () => {
       <div className="flex-1 flex min-w-0 overflow-hidden relative">
         {/* Truth Scanline Overlay */}
         {isTruthMode && (
-          <div className="absolute inset-0 pointer-events-none z-[100] opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
+          <div className="absolute inset-0 pointer-events-none z-[100] opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0, blue,0.06))] bg-[length:100%_2px,3px_100%]"></div>
         )}
 
         {/* Golden Path Step 1: Source Selection */}
@@ -246,19 +258,23 @@ export const DataEngineView: React.FC = () => {
           </div>
         </div>
 
-        {/* Resize Handle */}
+        {/* ITEM 43: Professional Resize Handle */}
         <div 
           onMouseDown={startResizing}
           className={`w-1.5 transition-colors cursor-col-resize z-[60] flex-shrink-0 relative group ${isTruthMode ? 'bg-blue-900/30' : 'bg-zinc-800 hover:bg-blue-600'}`}
         >
-          <div className="absolute top-1/2 -left-1 w-4 h-12 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity">
-             <div className="w-[1px] h-4 bg-zinc-500 mx-[1px]"></div>
-             <div className="w-[1px] h-4 bg-zinc-500 mx-[1px]"></div>
+          {/* Visual pays-off when hovered */}
+          <div className="absolute top-0 bottom-0 left-[-4px] right-[-4px] z-10"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-full bg-zinc-700 group-hover:bg-blue-400 transition-colors"></div>
+          
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-12 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-700 opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100 shadow-xl">
+             <div className="w-[1.5px] h-3 bg-zinc-500 mx-[1px] rounded-full"></div>
+             <div className="w-[1.5px] h-3 bg-zinc-500 mx-[1px] rounded-full"></div>
           </div>
         </div>
 
         {/* Golden Path Step 3: Result / Bus Monitoring */}
-        <div style={{ width: monitorWidth }} className={`flex-shrink-0 flex flex-col h-full overflow-hidden border-l relative transition-colors duration-500 ${isTruthMode ? 'bg-black border-blue-900/40 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]' : 'bg-zinc-900 border-zinc-800'}`}>
+        <div style={{ width: monitorWidth }} className={`flex-shrink-0 flex flex-col h-full overflow-hidden border-l relative transition-all duration-500 ${isTruthMode ? 'bg-black border-blue-900/40 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]' : 'bg-zinc-900 border-zinc-800'}`}>
           <div className="absolute top-3 left-4 z-10 pointer-events-none">
             <div className={`flex items-center gap-2 px-2 py-1 border rounded-md backdrop-blur-md transition-all ${isTruthMode ? 'bg-green-600/10 border-green-500 text-green-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>
               <span className="text-[9px] font-black uppercase tracking-[0.2em]">3. Live Distribution Bus</span>
