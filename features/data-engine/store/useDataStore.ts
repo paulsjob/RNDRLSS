@@ -19,6 +19,7 @@ import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
 import { MLB_CANON_DICTIONARY } from '../../../contract/dictionaries/mlb';
+import { liveBus } from '../../../shared/data-runtime';
 
 const ADAPTERS: DataAdapter[] = [
   new SportsAdapter(),
@@ -87,7 +88,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().saveToOrg();
   },
   onConnect: (connection: Connection) => {
-    set({ edges: addEdge(connection, get().edges) });
+    set({ edges: addEdge({ ...connection, animated: true }, get().edges) });
     get().saveToOrg();
   },
   addNode: (node: Node) => {
@@ -188,6 +189,66 @@ export const useDataStore = create<DataState>((set, get) => ({
     return { importedCount, skippedCount, conflicts };
   }
 }));
+
+// Initialize LiveBus Sync for Graph
+liveBus.subscribeAll((msg) => {
+  const store = useDataStore.getState();
+  const { nodes, edges } = store;
+  if (!nodes.length) return;
+
+  // Extract changed keys
+  let changedKeys: string[] = [];
+  if (msg.type === 'snapshot') {
+    changedKeys = Object.keys(msg.values);
+  } else if (msg.type === 'delta') {
+    changedKeys = msg.changes.map(c => c.keyId);
+  } else if (msg.type === 'event') {
+    changedKeys = [msg.eventKeyId];
+  }
+
+  const updatedNodes = [...nodes];
+  const updatedEdges = [...edges];
+  let hasChanges = false;
+
+  changedKeys.forEach(keyId => {
+    const record = liveBus.getValue(keyId);
+    if (!record) return;
+
+    // Find nodes associated with this key
+    updatedNodes.forEach((node, idx) => {
+      if (node.data.keyId === keyId) {
+        hasChanges = true;
+        updatedNodes[idx] = {
+          ...node,
+          data: {
+            ...node.data,
+            value: record.value,
+            lastUpdated: Date.now()
+          }
+        };
+
+        // Trigger edge animations for outgoing connections
+        updatedEdges.forEach((edge, eIdx) => {
+          if (edge.source === node.id) {
+            updatedEdges[eIdx] = { ...edge, animated: true };
+          }
+        });
+      }
+    });
+  });
+
+  if (hasChanges) {
+    useDataStore.setState({ nodes: updatedNodes, edges: updatedEdges });
+    
+    // Throttled reset of edge animations to keep things clean but responsive
+    setTimeout(() => {
+      const currentNodes = useDataStore.getState().nodes;
+      const currentEdges = useDataStore.getState().edges;
+      const cleanedEdges = currentEdges.map(e => ({ ...e, animated: false }));
+      useDataStore.setState({ edges: cleanedEdges });
+    }, 1000);
+  }
+});
 
 // Initial load
 setTimeout(() => {
