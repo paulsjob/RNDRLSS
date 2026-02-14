@@ -25,6 +25,31 @@ const BindingToast: React.FC<{ label: string; onDone: () => void }> = ({ label, 
   );
 };
 
+// ITEM 40: Lightweight Heartbeat Ticker for Nodes
+const LastTickIndicator: React.FC<{ lastActiveAt?: number; tickCount: number }> = ({ lastActiveAt, tickCount }) => {
+  const [now, setNow] = useState(Date.now());
+  
+  useEffect(() => {
+    if (!lastActiveAt) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [lastActiveAt]);
+
+  if (!lastActiveAt || tickCount === 0) return null;
+  
+  const diff = (now - lastActiveAt) / 1000;
+  
+  return (
+    <div className="mt-1.5 pt-1.5 border-t border-blue-500/10 flex items-center justify-between">
+      <span className="text-[6px] text-zinc-700 font-mono uppercase tracking-tighter">Heartbeat</span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[6px] text-blue-500/60 font-mono">T+{diff.toFixed(0)}s</span>
+        <span className="text-[6px] bg-blue-600/10 text-blue-400 px-1 rounded border border-blue-500/20 font-bold">#{tickCount}</span>
+      </div>
+    </div>
+  );
+};
+
 const NodeCanvasInner: React.FC = () => {
   const { 
     nodes, 
@@ -48,12 +73,12 @@ const NodeCanvasInner: React.FC = () => {
     isTruthMode,
     selection,
     setSelection,
+    nodeActivity,
     orgId
   } = useDataStore();
 
   const [bindingConfirmation, setBindingConfirmation] = useState<string | null>(null);
 
-  // Derived step for highlighting
   const currentStep = useMemo(() => {
     if (simController.status === 'idle') return 1;
     if (selection.id === null) return 2;
@@ -97,7 +122,8 @@ const NodeCanvasInner: React.FC = () => {
   };
 
   const nodeWithData = nodes.map(node => {
-    const isRecentlyUpdated = Date.now() - (node.data.lastUpdated || 0) < 800;
+    const activity = nodeActivity[node.id];
+    const isRecentlyUpdated = activity && (Date.now() - activity.lastActiveAt < 800);
     const isWiringTarget = !isTruthMode && isWiringMode && activeWiringSource?.type === 'key';
     const hasError = !isTruthMode && validation.offendingNodeIds.has(node.id);
     const isTraced = selection.id === node.id || selection.id === node.data.keyId;
@@ -122,7 +148,7 @@ const NodeCanvasInner: React.FC = () => {
               ) : hasError ? (
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
               ) : (
-                <div className={`w-1.5 h-1.5 rounded-full ${isRecentlyUpdated ? 'bg-blue-400 animate-ping' : 'bg-zinc-800'}`}></div>
+                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${isRecentlyUpdated ? 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,1)] scale-150' : 'bg-zinc-800'}`}></div>
               )}
             </div>
             <div className="flex flex-col">
@@ -144,6 +170,12 @@ const NodeCanvasInner: React.FC = () => {
                 </button>
               </div>
             )}
+            
+            {/* ITEM 40: Alive Ticker */}
+            {!isTruthMode && (
+               <LastTickIndicator lastActiveAt={activity?.lastActiveAt} tickCount={activity?.tickCount || 0} />
+            )}
+
             {isTruthMode && (
               <div className="mt-1.5 pt-1.5 border-t border-blue-500/10 flex items-center justify-between">
                 <span className="text-[6px] text-zinc-600 font-mono">LATENCY</span>
@@ -157,23 +189,27 @@ const NodeCanvasInner: React.FC = () => {
         ...node.style,
         background: isTraced ? '#1e40af' : node.style?.background,
         borderColor: isTraced ? '#3b82f6' : hasError ? '#ef4444' : isRecentlyUpdated ? '#3b82f6' : (isWiringTarget ? '#3b82f6aa' : '#1e293b'),
-        boxShadow: isTraced ? '0 0 30px rgba(59, 130, 246, 0.4)' : hasError ? '0 0 15px rgba(239, 68, 68, 0.2)' : isRecentlyUpdated ? '0 0 20px rgba(59, 130, 246, 0.4)' : (isWiringTarget ? '0 0 15px rgba(59, 130, 246, 0.2)' : '0 4px 10px rgba(0,0,0,0.5)'),
+        boxShadow: isTraced ? '0 0 30px rgba(59, 130, 246, 0.4)' : hasError ? '0 0 15px rgba(239, 68, 68, 0.2)' : isRecentlyUpdated ? '0 0 25px rgba(59, 130, 246, 0.5)' : (isWiringTarget ? '0 0 15px rgba(59, 130, 246, 0.2)' : '0 4px 10px rgba(0,0,0,0.5)'),
         transform: isTraced || isRecentlyUpdated ? 'scale(1.05)' : 'scale(1)',
         opacity: isTruthMode && selection.id && !isTraced ? 0.3 : 1
       }
     };
   });
 
-  const edgesWithTruth = edges.map(edge => {
+  const edgesWithFlow = edges.map(edge => {
+    const sourceActivity = nodeActivity[edge.source];
+    const isSourceActive = sourceActivity && (Date.now() - sourceActivity.lastActiveAt < 800);
     const isHighlighted = isTruthMode && selection.id && (edge.source === selection.id || edge.target === selection.id);
+    
     return {
       ...edge,
-      animated: isHighlighted || edge.animated,
+      animated: isHighlighted || isSourceActive,
       style: {
         ...edge.style,
-        stroke: isHighlighted ? '#3b82f6' : edge.style?.stroke,
-        strokeWidth: isHighlighted ? 4 : edge.style?.strokeWidth,
-        opacity: isTruthMode && selection.id && !isHighlighted ? 0.1 : 1
+        stroke: isHighlighted ? '#3b82f6' : isSourceActive ? '#60a5fa' : edge.style?.stroke,
+        strokeWidth: isHighlighted ? 4 : isSourceActive ? 3 : edge.style?.strokeWidth,
+        opacity: isTruthMode && selection.id && !isHighlighted ? 0.1 : 1,
+        transition: 'all 0.3s ease'
       }
     };
   });
@@ -208,7 +244,7 @@ const NodeCanvasInner: React.FC = () => {
         }
         .react-flow__node {
           cursor: grab;
-          transition: opacity 0.5s ease, transform 0.3s ease, border-color 0.3s ease;
+          transition: opacity 0.5s ease, transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
         }
         .react-flow__node:active {
           cursor: grabbing;
@@ -221,7 +257,7 @@ const NodeCanvasInner: React.FC = () => {
       
       <ReactFlow
         nodes={nodeWithData}
-        edges={edgesWithTruth}
+        edges={edgesWithFlow}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -243,7 +279,7 @@ const NodeCanvasInner: React.FC = () => {
             </div>
             
             <div className="w-full bg-zinc-800 h-1 rounded-full mb-4 overflow-hidden">
-               <div className={`h-full transition-all duration-1000 ${confidenceScore > 80 ? 'bg-green-500' : 'bg-blue-500'}`} style={{ width: `${confidenceScore}%` }}></div>
+               <div className={`h-full transition-all duration-1000 ${confidenceScore > 80 ? 'bg-green-500' : confidenceScore > 40 ? 'bg-amber-500' : 'bg-blue-500'}`} style={{ width: `${confidenceScore}%` }}></div>
             </div>
 
             <div className="flex gap-2">

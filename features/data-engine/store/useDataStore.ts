@@ -37,6 +37,11 @@ export interface ValidationResult {
   keyId?: string;
 }
 
+export interface NodeActivity {
+  lastActiveAt: number;
+  tickCount: number;
+}
+
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
 export type SimStatus = 'idle' | 'ready' | 'running' | 'paused' | 'error';
 export type SimMode = 'demoPipeline' | 'feedOnly' | 'scenario';
@@ -59,6 +64,9 @@ interface DataState {
     activeScenarioId: string | null;
     lastError: string | null;
   };
+
+  // Node Flow State (ITEM 40)
+  nodeActivity: Record<string, NodeActivity>;
 
   // Unified Selection (ITEM 33)
   selection: {
@@ -143,6 +151,9 @@ interface DataState {
   transportStop: () => void;
   transportPause: () => void;
 
+  // Flow Actions (ITEM 40)
+  registerNodeActivity: (nodeId: string) => void;
+
   // Setup/Mode Actions (Secondary)
   setSimMode: (mode: SimMode, scenarioId?: string | null) => void;
   startDemoPipeline: () => void;
@@ -208,6 +219,8 @@ export const useDataStore = create<DataState>((set, get) => ({
     lastError: null,
   },
 
+  nodeActivity: {},
+
   selection: {
     kind: null,
     id: null,
@@ -266,14 +279,22 @@ export const useDataStore = create<DataState>((set, get) => ({
     manifest: null,
   },
 
-  // ITEM 39: Transport Logic
+  registerNodeActivity: (nodeId) => set(state => ({
+    nodeActivity: {
+      ...state.nodeActivity,
+      [nodeId]: {
+        lastActiveAt: Date.now(),
+        tickCount: (state.nodeActivity[nodeId]?.tickCount || 0) + 1
+      }
+    }
+  })),
+
   transportStart: () => {
     const { simController } = get();
-    // Default to demo if no mode is selected
     const targetMode = simController.mode || 'demoPipeline';
     
     if (simController.status === 'paused') {
-      get().pause(); // Existing pause logic toggles
+      get().pause(); 
       return;
     }
 
@@ -282,7 +303,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     else if (targetMode === 'scenario' && simController.activeScenarioId) {
       get().playScenario(simController.activeScenarioId);
     } else if (targetMode === 'scenario') {
-      // If scenario mode but none selected, default to first scenario
       get().playScenario('opening_pitch');
     }
   },
@@ -346,7 +366,8 @@ export const useDataStore = create<DataState>((set, get) => ({
       selectedTraceId: null,
       demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
       goldenPath: { ...get().goldenPath, isBound: false, error: null },
-      simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null }
+      simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null },
+      nodeActivity: {}
     });
   },
 
@@ -429,7 +450,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     const { demoPipeline } = get();
     const nextTimer = Math.max(0, demoPipeline.timer - 1);
     
-    // Logic: small chance to increment score
     let nextHome = demoPipeline.homeScore;
     let nextAway = demoPipeline.awayScore;
     if (Math.random() > 0.98) nextHome++;
@@ -656,7 +676,6 @@ export const useDataStore = create<DataState>((set, get) => ({
           }
         });
 
-        // Add some "Warnings" and "Info" based on simulation state
         if (simController.status === 'idle') {
           results.push({ 
             id: 'v-w-1', 
@@ -843,6 +862,10 @@ liveBus.subscribeAll((msg) => {
     updatedNodes.forEach((node, idx) => {
       if (node.data.keyId === keyId) {
         hasChanges = true;
+        
+        // ITEM 40: Drive Flow Activity
+        store.registerNodeActivity(node.id);
+
         updatedNodes[idx] = {
           ...node,
           data: {
