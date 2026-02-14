@@ -1,21 +1,24 @@
-
 {
-  "name": "renderless-studio",
-  "version": "2.0.4",
-  "description": "Cloud-native live graphics platform",
+  "name": "rndrlss-|-cloud-native-live-graphics",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "build": "tsc",
-    "validate:dictionaries": "tsc --noEmit && node -e 'require(\"./contract/tools/validate-dictionaries\").validateAllDictionaries()'"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react": "^19.2.4",
     "zustand": "^5.0.11",
     "reactflow": "^11.11.4",
     "zod": "3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "ts-node": "^10.9.1"
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
   }
 }
