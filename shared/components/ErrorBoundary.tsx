@@ -14,10 +14,10 @@ export interface ErrorBoundaryState {
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Inherits from Component to provide error boundary lifecycle methods.
+ * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-// FIX: Using explicit Component import and providing generic types to ensure 'props' and 'state' are correctly inherited from the React base class.
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// FIX: Using explicit React.Component to ensure 'props' and 'state' are correctly inherited and recognized by the TypeScript compiler.
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // FIX: Explicitly initializing state within the constructor to ensure it is correctly associated with the React component context.
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // FIX: Correctly accessing featureName from this.props which is now recognized through inheritance.
+    // FIX: Accessing featureName from this.props which is now recognized through inheritance.
     const { featureName } = this.props;
     console.group(`[Renderless Error] ${featureName || 'Component'}`);
     console.error("Error:", error);

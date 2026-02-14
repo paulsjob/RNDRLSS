@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useStudioStore } from '../store/useStudioStore';
 import { RESOLUTIONS, LayerType, AspectRatio } from '../../../shared/types';
 import { resolveResponsiveLayers } from '../../../services/resolver';
+import { TextLayerRenderer } from './TextLayerRenderer';
 
 export const Workspace: React.FC = () => {
   const { currentTemplate, ui, selection, selectLayer, updateLayerTransform } = useStudioStore();
@@ -15,7 +16,6 @@ export const Workspace: React.FC = () => {
   const canvasWidth = activeRes.width;
   const canvasHeight = activeRes.height;
 
-  // Zoom-to-fit logic
   useEffect(() => {
     const calculateScale = () => {
       if (!containerRef.current) return;
@@ -69,17 +69,14 @@ export const Workspace: React.FC = () => {
       onMouseUp={handleMouseUp}
       onClick={() => selectLayer(null)}
     >
-      {/* Stage Grid Background */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
       
-      {/* Resolution Indicator */}
       <div className="absolute top-4 right-4 flex gap-4 items-center">
         <div className="px-2 py-1 rounded bg-black/50 border border-zinc-800 text-[10px] font-mono text-zinc-500 uppercase">
           Zoom: {Math.round(scale * 100)}%
         </div>
       </div>
 
-      {/* The Canvas Stage */}
       <div 
         className="bg-black shadow-[0_0_100px_rgba(0,0,0,0.5)] relative border border-zinc-800 overflow-hidden will-change-transform"
         style={{
@@ -92,13 +89,14 @@ export const Workspace: React.FC = () => {
         {resolvedLayers.map((layer) => {
           if (!layer.visible) return null;
           const isSelected = selection.selectedLayerId === layer.id;
+          const isPulsing = ui.lastPulseLayerId === layer.id;
           const { transform, type, content } = layer;
 
           return (
             <div
               key={layer.id}
               onMouseDown={(e) => handleMouseDown(e, layer.id)}
-              className={`absolute cursor-move transition-shadow ${isSelected ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-zinc-600'}`}
+              className={`absolute cursor-move transition-all duration-300 ${isSelected ? 'ring-2 ring-blue-500 z-10' : 'hover:ring-1 hover:ring-zinc-600'} ${isPulsing ? 'scale-[1.05] ring-4 ring-blue-400 z-20 shadow-[0_0_30px_rgba(59,130,246,0.6)]' : ''}`}
               style={{
                 left: transform.x,
                 top: transform.y,
@@ -106,24 +104,12 @@ export const Workspace: React.FC = () => {
                 height: transform.height,
                 opacity: transform.opacity,
                 transform: `rotate(${transform.rotation}deg)`,
-                zIndex: isSelected ? 50 : 0
+                zIndex: isSelected || isPulsing ? 50 : 0
               }}
             >
-              {type === LayerType.TEXT && (
-                <div 
-                  style={{ 
-                    fontSize: (content as any).fontSize || 16,
-                    color: (content as any).color || 'white',
-                    fontWeight: (content as any).fontWeight || 'normal',
-                    textAlign: (content as any).textAlign || 'left',
-                    fontFamily: (content as any).fontFamily
-                  }}
-                  className="w-full h-full flex items-center justify-center whitespace-nowrap overflow-hidden"
-                >
-                  {(content as any).text}
-                </div>
-              )}
-              {type === LayerType.SHAPE && (
+              {type === LayerType.TEXT ? (
+                <TextLayerRenderer layer={layer} scale={1} />
+              ) : type === LayerType.SHAPE ? (
                 <div 
                   className="w-full h-full"
                   style={{ 
@@ -131,7 +117,14 @@ export const Workspace: React.FC = () => {
                     borderRadius: (content as any).borderRadius || 0
                   }}
                 />
-              )}
+              ) : type === LayerType.IMAGE ? (
+                <img 
+                  src={(content as any).url} 
+                  className="w-full h-full"
+                  style={{ objectFit: (content as any).fit }}
+                  draggable={false}
+                />
+              ) : null}
             </div>
           );
         })}

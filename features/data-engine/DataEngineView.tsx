@@ -6,9 +6,11 @@ import { LiveMonitor } from './components/LiveMonitor';
 import { BindingTestConsole } from './components/BindingTestConsole';
 import { SnapshotManager } from './components/SnapshotManager';
 import { useDataStore } from './store/useDataStore';
+import { GoldenPathPanel } from './components/GoldenPathPanel';
+import { PipelineVisualizer } from './components/PipelineVisualizer';
 
 const PipelineHeader: React.FC = () => {
-  const { activeAdapterId, availableAdapters, simState, busState, isTruthMode, setTruthMode } = useDataStore();
+  const { activeAdapterId, availableAdapters, simState, busState, isTruthMode, setTruthMode, goldenPath } = useDataStore();
   const adapter = availableAdapters.find(a => a.id === activeAdapterId);
 
   return (
@@ -16,20 +18,20 @@ const PipelineHeader: React.FC = () => {
       <div className="flex items-center gap-8">
         <div className="flex items-center gap-3">
           <div className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest transition-all ${isTruthMode ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
-            {isTruthMode ? 'Reality-Active' : 'Pipeline'}
+            {isTruthMode ? 'Reality-Active' : 'Golden Path Demo'}
           </div>
           <h2 className={`text-xs font-bold uppercase tracking-widest transition-colors ${isTruthMode ? 'text-blue-400' : 'text-zinc-100'}`}>
-            Data Engine Studio
+            Pipeline Intelligence
           </h2>
         </div>
         
         <div className="h-4 w-px bg-zinc-800"></div>
         
         <div className="flex items-center gap-4">
-          <div className="flex flex-col">
-            <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tighter">Active Provider</span>
-            <span className="text-[10px] text-zinc-300 font-bold uppercase">{adapter?.name || 'Loading...'}</span>
-          </div>
+           <div className={`w-2 h-2 rounded-full ${goldenPath.simRunning ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+           <span className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">
+             {goldenPath.simRunning ? 'Live Feed Active' : 'Simulation Standby'}
+           </span>
         </div>
       </div>
 
@@ -43,17 +45,6 @@ const PipelineHeader: React.FC = () => {
         </div>
 
         <div className="h-6 w-px bg-zinc-800"></div>
-
-        {/* Simulation State */}
-        <div className={`flex items-center gap-2 transition-opacity duration-300 ${isTruthMode ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${simState === 'playing' ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
-          <div className="flex flex-col">
-             <span className="text-[8px] text-zinc-600 font-black uppercase tracking-tighter leading-none">Simulation</span>
-             <span className={`text-[10px] font-black uppercase leading-none mt-1 ${simState === 'playing' ? 'text-blue-400' : 'text-zinc-500'}`}>
-               {simState === 'playing' ? 'Active' : 'Stopped'}
-             </span>
-          </div>
-        </div>
 
         {/* Bus Health */}
         <div className="flex items-center gap-2">
@@ -104,13 +95,6 @@ export const DataEngineView: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', stopResizing);
-    };
-  }, [handleMouseMove, stopResizing]);
-
   return (
     <div className={`flex flex-col h-full w-full overflow-hidden transition-all duration-700 ${isTruthMode ? 'bg-zinc-950 ring-inset ring-1 ring-blue-500/20' : 'bg-zinc-950'}`}>
       <PipelineHeader />
@@ -121,31 +105,24 @@ export const DataEngineView: React.FC = () => {
           <div className="absolute inset-0 pointer-events-none z-[100] opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
         )}
 
-        {/* Step 1: Sources */}
-        <div className={`flex flex-col shrink-0 relative group transition-all duration-500 ${isTruthMode ? 'border-blue-900/20' : ''}`}>
-          <DataDictionaryBrowser />
+        {/* Golden Path Step 1: Source Selection */}
+        <div className={`w-[360px] flex flex-col shrink-0 relative group transition-all duration-500 ${isTruthMode ? 'border-blue-900/20 shadow-2xl' : 'border-r border-zinc-800'}`}>
+          <GoldenPathPanel />
         </div>
         
-        {/* Step 2: Logic Canvas */}
+        {/* Golden Path Step 2: Visual Pipeline */}
         <div className="flex-1 flex flex-col min-w-0 relative">
           <div className="absolute top-3 left-4 z-10 pointer-events-none">
             <div className={`flex items-center gap-2 px-2 py-1 border rounded-md backdrop-blur-md transition-all ${isTruthMode ? 'bg-blue-600/10 border-blue-500 text-blue-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isTruthMode ? 'Diagnostic Path' : '2. Logic Transform'}</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em]">2. Logical Data Path</span>
             </div>
           </div>
           
-          <div className="flex-1 relative">
-            <NodeCanvas />
+          <div className="flex-1 relative bg-black/20">
+            <PipelineVisualizer />
           </div>
           
           <div className={`shrink-0 flex flex-col transition-all duration-500 ${isTruthMode ? 'opacity-30 grayscale pointer-events-none blur-[1px]' : ''}`}>
-            <div className="h-6 flex items-center justify-center bg-black/40 border-t border-zinc-800/50">
-               <span className="text-[8px] font-black text-zinc-700 uppercase tracking-[0.5em] flex items-center gap-2">
-                 Manual Overrides & Snapshots
-                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m7 13 5 5 5-5M7 6l5 5 5-5"/></svg>
-               </span>
-            </div>
-            <BindingTestConsole />
             <SnapshotManager />
           </div>
         </div>
@@ -161,11 +138,11 @@ export const DataEngineView: React.FC = () => {
           </div>
         </div>
 
-        {/* Step 3: Bus Monitor */}
+        {/* Golden Path Step 3: Result / Bus Monitoring */}
         <div style={{ width: monitorWidth }} className={`flex-shrink-0 flex flex-col h-full overflow-hidden border-l relative transition-colors duration-500 ${isTruthMode ? 'bg-black border-blue-900/40 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]' : 'bg-zinc-900 border-zinc-800'}`}>
           <div className="absolute top-3 left-4 z-10 pointer-events-none">
             <div className={`flex items-center gap-2 px-2 py-1 border rounded-md backdrop-blur-md transition-all ${isTruthMode ? 'bg-green-600/10 border-green-500 text-green-400' : 'bg-green-500/10 border-green-500/20 text-green-400'}`}>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em]">{isTruthMode ? 'Live Distribution' : '3. Distribution Bus'}</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em]">3. Live Distribution Bus</span>
             </div>
           </div>
           <LiveMonitor />

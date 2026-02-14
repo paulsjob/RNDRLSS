@@ -24,6 +24,7 @@ interface StudioState {
     zoomLevel: number;
     activeResolution: keyof typeof RESOLUTIONS;
     editingLayerId: string | null; // Track text editing mode
+    lastPulseLayerId: string | null; // Track visual pulse on data update
   };
   selection: {
     selectedLayerId: string | null;
@@ -122,6 +123,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     zoomLevel: 1,
     activeResolution: 'BROADCAST',
     editingLayerId: null,
+    lastPulseLayerId: null,
   },
   selection: {
     selectedLayerId: null,
@@ -243,21 +245,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const cw = res.width;
     const ch = res.height;
     
-    // Use natural dimensions if available, otherwise default
     const iw = asset.width || 800;
     const ih = asset.height || 600;
     
     let width, height, x, y;
     
-    // GOAL 2: Correct initial image sizing
-    // If exactly 1920x1080 (Broadcast) or matches stage resolution, fill viewport
     if ((iw === 1920 && ih === 1080) || (iw === cw && ih === ch)) {
       width = cw;
       height = ch;
       x = 0;
       y = 0;
     } else {
-      // Fit to stage preserving aspect ratio, with 60% of stage width as max size
       const maxW = cw * 0.6;
       const maxH = ch * 0.6;
       const scaleToFit = Math.min(maxW / iw, maxH / ih);
@@ -308,7 +306,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   removeLayer: (id) => set((state) => {
     if (!state.currentTemplate) return state;
-    // Clean up editing state if deleted
     const isEditing = state.ui.editingLayerId === id;
     
     return {
@@ -330,7 +327,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     
     if (!dictionaryItemId) {
       delete newBindings[key];
-      // Restore static text if available
       const layer = state.currentTemplate.layers.find(l => l.id === layerId);
       if (layer && (layer.content as any).staticText !== undefined) {
         return {
@@ -347,7 +343,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         };
       }
     } else {
-      // Encode keyId and transform into the binding value to keep compatibility with Record<string, string>
       newBindings[key] = `${dictionaryItemId}|${transform}`;
     }
     
@@ -365,7 +360,6 @@ liveBus.subscribeAll((msg) => {
   const template = state.currentTemplate;
   if (!template) return;
 
-  // Extract changed keys
   let changedValues: Record<string, any> = {};
   if (msg.type === 'snapshot') {
     changedValues = msg.values;
@@ -375,9 +369,9 @@ liveBus.subscribeAll((msg) => {
     return;
   }
 
-  // Find layers affected by these changes
   const updates: Record<string, Partial<any>> = {};
   let hasUpdates = false;
+  let pulseLayerId: string | null = null;
 
   Object.entries(template.bindings).forEach(([bindingKey, value]) => {
     const parts = (value as string).split('|');
@@ -388,7 +382,6 @@ liveBus.subscribeAll((msg) => {
       const [layerId, property] = bindingKey.split('.');
       const layer = template.layers.find(l => l.id === layerId);
       
-      // Prevent live data from overwriting text while the user is manually editing it
       if (layer && property === 'text' && layer.type === LayerType.TEXT && state.ui.editingLayerId !== layer.id) {
         const rawValue = changedValues[keyId];
         const processedValue = applyTransforms(rawValue, transform === 'none' ? [] : [transform]);
@@ -400,18 +393,25 @@ liveBus.subscribeAll((msg) => {
 
         updates[layerId] = contentUpdate;
         hasUpdates = true;
+        pulseLayerId = layerId; // Trigger visual payoff
       }
     }
   });
 
   if (hasUpdates) {
-    useStudioStore.setState({
+    useStudioStore.setState((s) => ({
+      ui: { ...s.ui, lastPulseLayerId: pulseLayerId },
       currentTemplate: {
         ...template,
         layers: template.layers.map(l => 
           updates[l.id] ? { ...l, content: { ...l.content, ...updates[l.id] } } : l
         ) as Layer[]
       }
-    });
+    }));
+
+    // Reset pulse after duration
+    setTimeout(() => {
+      useStudioStore.setState(s => ({ ui: { ...s.ui, lastPulseLayerId: null } }));
+    }, 500);
   }
 });

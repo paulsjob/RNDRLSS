@@ -18,7 +18,7 @@ import { Dictionary, MappingSpec, KeyId } from '../../../contract/types';
 import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
-import { MLB_CANON_DICTIONARY } from '../../../contract/dictionaries/mlb';
+import { MLB_CANON_DICTIONARY, MLB_KEYS } from '../../../contract/dictionaries/mlb';
 import { liveBus } from '../../../shared/data-runtime';
 
 const ADAPTERS: DataAdapter[] = [
@@ -33,11 +33,7 @@ export type SimState = 'stopped' | 'playing' | 'paused';
 export type BusState = 'idle' | 'streaming' | 'error';
 export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'STALE' | 'INVALID';
 
-interface ImportResult {
-  importedCount: number;
-  skippedCount: number;
-  conflicts: string[];
-}
+export type SourceMode = 'static' | 'simulated' | 'manual';
 
 interface DataState {
   orgId: string;
@@ -45,26 +41,35 @@ interface DataState {
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
   
-  // Truth Mode (Item 30)
+  // Golden Path Demo State (Item 31)
+  goldenPath: {
+    sourceMode: SourceMode;
+    rawInput: string;
+    transformedValue: any;
+    isBound: boolean;
+    bindingTarget: string; // e.g. "Home Score"
+    simRunning: boolean;
+    simSpeed: 'slow' | 'normal' | 'fast';
+    lastUpdateTs: number;
+    error: string | null;
+  };
+  
+  // Truth Mode
   isTruthMode: boolean;
-  selectedTraceId: string | null; // KeyId or NodeId
+  selectedTraceId: string | null;
   
   // Pipeline State
   simState: SimState;
   busState: BusState;
   
-  // Wiring Mode
   isWiringMode: boolean;
   activeWiringSource: { id: string; type: 'key' | 'node'; label?: string } | null;
   
-  // Dictionaries
   builtinDictionaries: Dictionary[];
   importedDictionaries: Dictionary[];
   mappings: MappingSpec[];
   
   isLoading: boolean;
-  
-  // React Flow State
   nodes: Node[];
   edges: Edge[];
   onNodesChange: OnNodesChange;
@@ -72,7 +77,6 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
-  // Validation & Deployment
   validation: {
     status: ValidationStatus;
     errors: { message: string; nodeId?: string }[];
@@ -86,6 +90,13 @@ interface DataState {
   };
 
   // Actions
+  setGoldenPathSource: (mode: SourceMode) => void;
+  updateRawInput: (val: string) => void;
+  toggleGoldenSim: () => void;
+  setGoldenSimSpeed: (speed: 'slow' | 'normal' | 'fast') => void;
+  bindToGraphic: (target: string) => void;
+  validateGoldenPath: () => void;
+  
   setOrgId: (id: string) => void;
   setSimState: (state: SimState) => void;
   setBusState: (state: BusState) => void;
@@ -97,11 +108,9 @@ interface DataState {
   validateGraph: () => void;
   deployEndpoint: () => void;
   resetDeployment: () => void;
-  
-  // Persistence
   saveToOrg: () => void;
   loadFromOrg: (id: string) => void;
-  importBundleData: (data: { dictionaries: Dictionary[], mappings: MappingSpec[], graphs: any[] }) => ImportResult;
+  importBundleData: (data: { dictionaries: Dictionary[], mappings: MappingSpec[], graphs: any[] }) => any;
 }
 
 export const useDataStore = create<DataState>((set, get) => ({
@@ -110,24 +119,30 @@ export const useDataStore = create<DataState>((set, get) => ({
   activeAdapterId: ADAPTERS[0].id,
   liveSnapshot: {},
   
-  // Truth State
+  goldenPath: {
+    sourceMode: 'manual',
+    rawInput: '10',
+    transformedValue: 10,
+    isBound: false,
+    bindingTarget: 'Home Score',
+    simRunning: false,
+    simSpeed: 'normal',
+    lastUpdateTs: 0,
+    error: null,
+  },
+  
   isTruthMode: false,
   selectedTraceId: null,
-  
   simState: 'stopped',
   busState: 'idle',
-  
   isWiringMode: false,
   activeWiringSource: null,
-  
   builtinDictionaries: [MLB_CANON_DICTIONARY as unknown as Dictionary],
   importedDictionaries: [],
   mappings: [],
-  
   isLoading: false,
   nodes: [],
   edges: [],
-
   validation: {
     status: 'idle',
     errors: [],
@@ -138,6 +153,70 @@ export const useDataStore = create<DataState>((set, get) => ({
     status: 'idle',
     endpointUrl: null,
     manifestPreview: null,
+  },
+
+  setGoldenPathSource: (sourceMode) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, sourceMode, simRunning: false } }));
+  },
+
+  updateRawInput: (rawInput) => {
+    let transformedValue: any = rawInput;
+    try {
+      // Attempt numeric transform
+      if (!isNaN(Number(rawInput)) && rawInput.trim() !== '') {
+        transformedValue = Number(rawInput);
+      } else {
+        // Attempt JSON transform
+        transformedValue = JSON.parse(rawInput);
+      }
+    } catch (e) {
+      transformedValue = rawInput;
+    }
+
+    set(state => ({ 
+      goldenPath: { 
+        ...state.goldenPath, 
+        rawInput, 
+        transformedValue, 
+        lastUpdateTs: Date.now() 
+      } 
+    }));
+
+    // Auto-publish to the "Home Score" key for the demo payoff
+    liveBus.publish({
+      type: 'delta',
+      dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
+      dictionaryVersion: MLB_CANON_DICTIONARY.version,
+      sourceId: 'golden_path_demo',
+      seq: Date.now(),
+      ts: Date.now(),
+      changes: [{ keyId: MLB_KEYS.SCORE_HOME, value: transformedValue }]
+    });
+  },
+
+  toggleGoldenSim: () => {
+    const { goldenPath } = get();
+    set(state => ({ goldenPath: { ...state.goldenPath, simRunning: !state.goldenPath.simRunning } }));
+  },
+
+  setGoldenSimSpeed: (simSpeed) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, simSpeed } }));
+  },
+
+  bindToGraphic: (bindingTarget) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, isBound: true, bindingTarget } }));
+  },
+
+  validateGoldenPath: () => {
+    const { goldenPath } = get();
+    if (!goldenPath.isBound) {
+      set(state => ({ goldenPath: { ...state.goldenPath, error: "No graphic field is bound to this pipeline." } }));
+    } else if (goldenPath.lastUpdateTs === 0) {
+      set(state => ({ goldenPath: { ...state.goldenPath, error: "No data has flowed through the pipeline yet." } }));
+    } else {
+      set(state => ({ goldenPath: { ...state.goldenPath, error: null } }));
+      set(state => ({ validation: { ...state.validation, status: 'pass' } }));
+    }
   },
 
   setSimState: (simState) => set({ simState }),
