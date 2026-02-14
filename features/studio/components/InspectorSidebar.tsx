@@ -75,11 +75,11 @@ export const InspectorSidebar: React.FC = () => {
   } = useStudioStore();
 
   const { orgId } = useDataStore();
+  const [selectedTransform, setSelectedTransform] = useState<string>('none');
   
   // Sync dictionary registry for lookup safety
   const [availableDicts, setAvailableDicts] = useState<Dictionary[]>([]);
   useEffect(() => {
-    // Sync the registry with the active data engine org
     dictionaryRegistry.setOrgId(orgId);
     setAvailableDicts(dictionaryRegistry.listDictionaries());
 
@@ -141,6 +141,8 @@ export const InspectorSidebar: React.FC = () => {
   const bindingKey = `${layer.id}.${layer.type === LayerType.TEXT ? 'text' : 'color'}`;
   const boundKeyId = currentTemplate.bindings[bindingKey] || '';
   const boundLookup = boundKeyId ? dictionaryRegistry.getKey(boundKeyId) : null;
+
+  const transforms = selectedTransform === 'none' ? [] : [selectedTransform];
 
   return (
     <div className="w-[320px] h-full bg-zinc-900 border-l border-zinc-800 flex flex-col shadow-2xl">
@@ -217,7 +219,7 @@ export const InspectorSidebar: React.FC = () => {
                     <span className="text-[10px] font-black text-zinc-600 group-hover:text-blue-500 transition-colors uppercase tracking-widest">Bind Live Key</span>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className={`bg-zinc-950 rounded-2xl px-5 py-4 flex items-center justify-between group border transition-all ${boundLookup ? 'border-zinc-800 hover:border-blue-500/40 hover:bg-zinc-900' : 'border-red-900/50 bg-red-950/5 hover:border-red-500/50'}`}>
                       <div className="flex flex-col overflow-hidden gap-0.5">
                         <span className={`text-[12px] font-black truncate tracking-tight ${boundLookup ? 'text-blue-400' : 'text-zinc-600 italic'}`}>
@@ -240,6 +242,22 @@ export const InspectorSidebar: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                       </button>
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] text-zinc-600 uppercase font-black tracking-widest ml-1">Live Transformer</label>
+                      <select 
+                        value={selectedTransform}
+                        onChange={(e) => setSelectedTransform(e.target.value)}
+                        className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-[10px] font-bold text-zinc-400 focus:border-blue-500 outline-none hover:border-zinc-700 transition-colors cursor-pointer"
+                      >
+                        <option value="none">None (Raw Output)</option>
+                        <option value="upper">UPPERCASE</option>
+                        <option value="lower">lowercase</option>
+                        <option value="fixed(0)">Fixed Decimals (0)</option>
+                        <option value="fixed(2)">Fixed Decimals (2)</option>
+                        <option value="pct">Percentage (0.5 -> 50%)</option>
+                      </select>
+                    </div>
                   </div>
                 )}
               </>
@@ -248,7 +266,7 @@ export const InspectorSidebar: React.FC = () => {
             {boundKeyId && !isBindingMode && (
               <LiveValuePreview 
                 keyId={boundKeyId} 
-                transforms={[]} 
+                transforms={transforms} 
               />
             )}
           </div>

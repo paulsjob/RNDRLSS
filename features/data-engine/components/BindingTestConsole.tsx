@@ -10,11 +10,9 @@ import { useDataStore } from '../store/useDataStore';
 export const BindingTestConsole: React.FC = () => {
   const { orgId, setOrgId } = useDataStore();
   
-  // Local state for available dictionaries based on current registry org
   const [availableDicts, setAvailableDicts] = useState(dictionaryRegistry.listDictionaries());
 
   useEffect(() => {
-    // Sync registry org with store org
     dictionaryRegistry.setOrgId(orgId);
     setAvailableDicts(dictionaryRegistry.listDictionaries());
     
@@ -41,11 +39,26 @@ export const BindingTestConsole: React.FC = () => {
       return;
     }
 
-    const { dictionary } = lookup;
+    const { dictionary, key } = lookup;
 
     try {
-      const parsedValue = JSON.parse(value || 'null');
+      // 1. Basic JSON parse
+      let parsedValue;
+      try {
+        parsedValue = JSON.parse(value || 'null');
+      } catch (e) {
+        // If it's not valid JSON, treat it as a raw string for convenience
+        parsedValue = value;
+      }
       
+      // 2. Value Type Validation (Simple check)
+      if (key.valueType === 'number' && isNaN(Number(parsedValue))) {
+        throw new Error(`Value must be a number for key ${key.alias}`);
+      }
+      if (key.valueType === 'boolean' && typeof parsedValue !== 'boolean' && parsedValue !== 'true' && parsedValue !== 'false') {
+         throw new Error(`Value must be a boolean for key ${key.alias}`);
+      }
+
       const basePayload = {
         dictionaryId: dictionary.dictionaryId,
         dictionaryVersion: dictionary.version,
@@ -79,7 +92,7 @@ export const BindingTestConsole: React.FC = () => {
     } catch (e: any) {
       console.error('[BindingTestConsole] Publish Error', e);
       setStatus({ 
-        msg: e.name === 'ZodError' ? "Protocol Violation" : "Invalid JSON", 
+        msg: e.message || "Protocol Violation", 
         color: "text-red-500" 
       });
     }
@@ -159,7 +172,7 @@ export const BindingTestConsole: React.FC = () => {
           <div className="flex-1 flex flex-col gap-2">
             <div className="flex justify-between items-center">
               <label className="text-[9px] text-zinc-500 uppercase font-black tracking-widest">4. Wire Payload</label>
-              <span className="text-[8px] text-zinc-700 font-mono italic">Strict JSON Validation</span>
+              <span className="text-[8px] text-zinc-700 font-mono italic">Strict JSON or Raw Value</span>
             </div>
             <textarea 
               value={value}

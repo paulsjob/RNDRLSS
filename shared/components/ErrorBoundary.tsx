@@ -1,5 +1,5 @@
 
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
@@ -16,17 +16,13 @@ export interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-// FIX: Explicitly using React.Component with generics to resolve "Property does not exist on type ErrorBoundary" errors by ensuring proper inheritance.
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Initializing state in the constructor for robust initialization
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    // FIX: Correctly initialize state as a member of the class extending React.Component to resolve property missing errors.
-    this.state = {
-      hasError: false,
-      error: null,
-    };
-  }
+// FIX: Explicitly using Component from named imports to ensure proper inheritance and type recognition for state and props.
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // FIX: Use class property for state initialization to resolve "Property 'state' does not exist" errors that can occur in some TypeScript environments when using constructor-based initialization.
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
 
   // Standard React Error Boundary static method to update state from errors
   public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -35,7 +31,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // FIX: Accessing this.props which is now properly inherited and typed from the React.Component base class.
+    // FIX: Accessing this.props which is now properly recognized through inheritance from Component.
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
@@ -44,12 +40,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: Accessing this.setState which is now properly inherited from React.Component.
+    // FIX: Accessing this.setState which is now properly recognized from the Component base class.
     this.setState({ hasError: false, error: null });
   };
 
   public render() {
-    // FIX: Accessing this.state and this.props which are now properly inherited and typed from the base class.
+    // FIX: Accessing this.state and this.props which are now properly recognized through inheritance from the Component base class.
     if (this.state.hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">
@@ -75,7 +71,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       );
     }
 
-    // FIX: Returning this.props.children which is correctly recognized via React.Component inheritance.
     return this.props.children;
   }
 }
