@@ -307,7 +307,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   removeLayer: (id) => set((state) => {
     if (!state.currentTemplate) return state;
+    // Clean up editing state if deleted
+    const isEditing = state.ui.editingLayerId === id;
+    
     return {
+      ui: {
+        ...state.ui,
+        editingLayerId: isEditing ? null : state.ui.editingLayerId
+      },
       currentTemplate: {
         ...state.currentTemplate,
         layers: state.currentTemplate.layers.filter((l) => l.id !== id)

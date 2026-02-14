@@ -30,12 +30,20 @@ interface TextLayerRendererProps {
  * Handles display and in-situ editing with pixel-perfect alignment.
  */
 export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, scale }) => {
-  const { ui, setEditingLayerId, updateLayerContent, currentTemplate } = useStudioStore();
+  const { ui, selection, setEditingLayerId, updateLayerContent, currentTemplate } = useStudioStore();
   const bindings = currentTemplate?.bindings || {};
   
   const isEditing = ui.editingLayerId === layer.id;
+  const isSelected = selection.selectedLayerId === layer.id;
   const [localText, setLocalText] = useState(layer.content.text || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Determine if it is in multiline "Area" mode vs single-line "Point" mode
+  // Heuristic: If height is significantly larger than fontSize * lineHeight, treat as Area
+  const isAreaMode = useMemo(() => {
+    const fontSize = layer.content.fontSize || 16;
+    return layer.transform.height > fontSize * 1.8;
+  }, [layer.transform.height, layer.content.fontSize]);
 
   // Sync local text when not editing
   useEffect(() => {
@@ -44,13 +52,22 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
     }
   }, [layer.content.text, isEditing]);
 
-  // Focus and select all text when entering edit mode
+  // Focus and put cursor at end when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
+      const el = textareaRef.current;
+      el.focus();
+      const length = el.value.length;
+      el.setSelectionRange(length, length);
     }
   }, [isEditing]);
+
+  // Auto-commit on selection change
+  useEffect(() => {
+    if (isEditing && !isSelected) {
+      commitChanges();
+    }
+  }, [isSelected, isEditing]);
 
   // Resolve binding info
   const bindingKey = `${layer.id}.text`;
@@ -66,17 +83,36 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
   }, [layer, record?.value, transform]);
 
   const commitChanges = () => {
+    // Only commit if the layer still exists and we are editing
+    const currentStore = useStudioStore.getState();
+    const exists = currentStore.currentTemplate?.layers.some(l => l.id === layer.id);
+    if (!exists) return;
+
     updateLayerContent(layer.id, { text: localText });
     setEditingLayerId(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Cmd+Enter / Ctrl+Enter always commits
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       commitChanges();
+      return;
     }
+
+    // Standard Enter behavior
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (!isAreaMode) {
+        // Point mode: Enter commits
+        e.preventDefault();
+        commitChanges();
+      }
+      // Area mode: Enter inserts newline (default behavior)
+    }
+
+    // Revert and exit on Escape
     if (e.key === 'Escape') {
-      setLocalText(layer.content.text || ''); // Revert
+      setLocalText(layer.content.text || ''); 
       setEditingLayerId(null);
     }
   };
@@ -98,9 +134,9 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
     fontWeight: layer.content.fontWeight || 'normal',
     textAlign: layer.content.textAlign || 'left',
     fontFamily: layer.content.fontFamily || 'Inter',
-    lineHeight: 1.2, // Fixed line height for deterministic alignment
+    lineHeight: 1.2, 
     letterSpacing: 'normal',
-    textTransform: 'none', // We render raw text in the editor
+    textTransform: 'none', 
   };
 
   if (isEditing) {
@@ -114,14 +150,14 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
         className="w-full h-full p-0 m-0 border-none outline-none resize-none bg-transparent overflow-hidden"
         style={{
           ...typoStyles,
-          whiteSpace: 'pre-wrap', // Support multi-line area mode
+          whiteSpace: 'pre-wrap', 
           wordBreak: 'break-all',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          // Force alignment to match the flex container of the display div
-          paddingTop: 'calc(50% - 0.6em)', 
-          marginTop: '-0.1em'
+          // Precise vertical centering logic matching the display div
+          paddingTop: isAreaMode ? '0' : 'calc(50% - 0.6em)',
+          marginTop: isAreaMode ? '0' : '-0.1em'
         }}
       />
     );
