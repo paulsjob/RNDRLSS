@@ -1,5 +1,5 @@
 
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
@@ -14,15 +14,18 @@ export interface ErrorBoundaryState {
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Inherits from React.Component to provide error boundary lifecycle methods.
+ * Inherits from Component to provide error boundary lifecycle methods.
  */
-// FIX: Using explicit React.Component to ensure standard properties like 'props' and 'setState' are correctly inherited and recognized.
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // FIX: State initialization via class property for clarity in TypeScript.
-  public state: ErrorBoundaryState = {
-    hasError: false,
-    error: null,
-  };
+// FIX: Using explicit Component from 'react' and providing generic types to ensure 'props' and 'state' are correctly inherited.
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // FIX: Explicitly initializing state within the constructor to ensure it is correctly associated with the React component context.
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
 
   // Standard React Error Boundary static method to update state from errors
   public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -31,8 +34,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // FIX: Correctly accessing featureName from this.props through React.Component inheritance.
-    console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
+    // FIX: Correctly accessing featureName from this.props which is now recognized through inheritance.
+    const { featureName } = this.props;
+    console.group(`[Renderless Error] ${featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
     console.groupEnd();
@@ -40,13 +44,16 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: Correctly calling this.setState from the React.Component base class.
+    // FIX: Correctly calling this.setState from the inherited React.Component base class.
     this.setState({ hasError: false, error: null });
   };
 
   public render(): ReactNode {
-    // FIX: Accessing this.state and this.props which are now properly recognized.
-    if (this.state.hasError) {
+    // FIX: Accessing state and props which are now properly recognized by the TypeScript compiler.
+    const { hasError, error } = this.state;
+    const { featureName, children } = this.props;
+
+    if (hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">
           <div className="w-16 h-16 bg-red-950/30 rounded-full flex items-center justify-center mb-6 border border-red-500/20">
@@ -54,11 +61,11 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           </div>
           <h2 className="text-xl font-bold text-zinc-100 mb-2">Feature Unavailable</h2>
           <p className="text-sm text-zinc-500 text-center max-w-md mb-8">
-            The <span className="text-zinc-300 font-mono">{this.props.featureName || 'requested feature'}</span> encountered a critical error and had to be suspended.
+            The <span className="text-zinc-300 font-mono">{featureName || 'requested feature'}</span> encountered a critical error and had to be suspended.
           </p>
           <div className="bg-black/50 border border-zinc-800 rounded-lg p-4 w-full max-w-xl mb-8 overflow-hidden text-left">
             <p className="text-[10px] font-mono text-red-400 truncate">
-              {this.state.error?.message || 'Unknown Execution Error'}
+              {error?.message || 'Unknown Execution Error'}
             </p>
           </div>
           <button 
@@ -71,6 +78,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }

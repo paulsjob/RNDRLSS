@@ -29,7 +29,7 @@ const ADAPTERS: DataAdapter[] = [
 
 export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
-export type SimState = 'stopped' | 'playing';
+export type SimState = 'stopped' | 'playing' | 'paused';
 export type BusState = 'idle' | 'streaming' | 'error';
 
 interface ImportResult {
