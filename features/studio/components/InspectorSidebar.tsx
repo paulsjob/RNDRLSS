@@ -131,7 +131,7 @@ export const InspectorSidebar: React.FC = () => {
                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700 group-hover:text-blue-500/50 transition-colors"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
             </div>
             <h5 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-2">No Layer Selection</h5>
-            <p className="text-[11px] text-zinc-600 font-medium italic leading-relaxed">Select a layer on the stage to modify its properties and live data bindings.</p>
+            <p className="text-[10px] text-zinc-600 font-bold leading-relaxed">Select a stage layer to begin data integration.</p>
           </div>
         </div>
       </div>
@@ -142,8 +142,11 @@ export const InspectorSidebar: React.FC = () => {
   const bindingValue = currentTemplate.bindings[bindingKey] || '';
   const [boundKeyId, boundTransform] = bindingValue.includes('|') ? bindingValue.split('|') : [bindingValue, 'none'];
   const boundLookup = boundKeyId ? dictionaryRegistry.getKey(boundKeyId) : null;
-
   const transforms = boundTransform === 'none' ? [] : [boundTransform];
+  
+  // HOOK: Get live value for field-level proof
+  const liveRecord = useLiveValue(boundKeyId || null);
+  const resolvedValue = liveRecord ? applyTransforms(liveRecord.value, transforms) : '—';
 
   const handleBindConfirm = (keyId: string, transform: string) => {
     setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', keyId || null, transform);
@@ -193,6 +196,108 @@ export const InspectorSidebar: React.FC = () => {
           </div>
         </section>
 
+        <section className="bg-zinc-800/20 p-5 rounded-2xl border border-zinc-800/50">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Layer Content</h4>
+            {boundKeyId && (
+              <div className="flex items-center gap-2 px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 animate-in fade-in">
+                 <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+                 <span className="text-[7px] font-black text-green-500 uppercase tracking-widest">Live</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            {/* Narrowing type for text-related properties - Fix for Property 'text' does not exist on type Layer error */}
+            {layer.type === LayerType.TEXT && (
+              <div className="relative group">
+                <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Display String</label>
+                <div className="flex gap-2">
+                  <div className={`flex-1 bg-black border rounded-xl p-3 transition-all ${boundKeyId ? 'border-blue-500/30' : 'border-zinc-800'}`}>
+                    {boundKeyId ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-black text-blue-400 font-mono">{resolvedValue}</span>
+                        <span className="text-[8px] text-zinc-600 font-bold uppercase truncate">From: {boundLookup?.key.alias || 'Registry Key'}</span>
+                      </div>
+                    ) : (
+                      <input 
+                        type="text" 
+                        value={layer.content.text || ''}
+                        onChange={(e) => updateLayerContent(layer.id, { text: e.target.value })}
+                        className="w-full bg-transparent text-xs text-zinc-100 outline-none font-medium" 
+                        placeholder="Static text..."
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {layer.type === LayerType.TEXT && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                   <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Text Color</label>
+                   <input 
+                    type="color" 
+                    value={layer.content.color}
+                    onChange={(e) => updateLayerContent(layer.id, { color: e.target.value })}
+                    className="w-full h-8 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer hover:border-zinc-700 transition-colors" 
+                  />
+                </div>
+                <div>
+                   <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Font Size</label>
+                   <input 
+                    type="number" 
+                    value={layer.content.fontSize}
+                    onChange={(e) => updateLayerContent(layer.id, { fontSize: parseInt(e.target.value) })}
+                    className="w-full bg-black border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-zinc-300 outline-none" 
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Support for Shape layers - Fix for type-safe color property access */}
+            {layer.type === LayerType.SHAPE && (
+              <div>
+                <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Fill Color</label>
+                <input 
+                  type="color" 
+                  value={layer.content.color}
+                  onChange={(e) => updateLayerContent(layer.id, { color: e.target.value })}
+                  className="w-full h-8 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer hover:border-zinc-700 transition-colors" 
+                />
+              </div>
+            )}
+
+            {/* Support for Image layers - Fix for type-safe url and fit property access */}
+            {layer.type === LayerType.IMAGE && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Image URL</label>
+                  <input 
+                    type="text" 
+                    value={layer.content.url}
+                    onChange={(e) => updateLayerContent(layer.id, { url: e.target.value })}
+                    className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-zinc-600 block mb-1 uppercase font-black">Object Fit</label>
+                  <select 
+                    value={layer.content.fit}
+                    onChange={(e) => updateLayerContent(layer.id, { fit: e.target.value as any })}
+                    className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white"
+                  >
+                    <option value="cover">Cover</option>
+                    <option value="contain">Contain</option>
+                    <option value="fill">Fill</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         <section className="bg-blue-600/5 p-5 rounded-3xl border border-blue-500/10 -mx-2 shadow-inner transition-all duration-500 relative overflow-hidden">
           {showSuccessBadge && (
             <div className="absolute inset-0 bg-blue-600 z-50 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
@@ -233,7 +338,7 @@ export const InspectorSidebar: React.FC = () => {
                     <div className="flex items-center gap-2">
                        <span className="text-[8px] text-zinc-700 font-mono uppercase tracking-tighter">
                         Bus: {boundLookup?.dictionary.dictionaryId.split('.').slice(-1)[0] || 'Unknown'}
-                      </span>
+                       </span>
                       {boundLookup && (
                         <div className="w-1 h-1 rounded-full bg-green-500/50 animate-pulse"></div>
                       )}

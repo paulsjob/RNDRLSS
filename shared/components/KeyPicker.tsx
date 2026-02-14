@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Dictionary, DictionaryKey, KeyKind } from '../../contract/types';
 
@@ -7,6 +8,7 @@ interface KeyPickerProps {
   onSelect: (keyId: string) => void;
   className?: string;
   filterKind?: KeyKind;
+  recommendedKeyIds?: string[];
 }
 
 export const KeyPicker: React.FC<KeyPickerProps> = ({ 
@@ -14,15 +16,15 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
   selectedKeyId, 
   onSelect,
   className = "",
-  filterKind
+  filterKind,
+  recommendedKeyIds = []
 }) => {
   const [search, setSearch] = useState("");
   const [selectedDictId, setSelectedDictId] = useState<string>("all");
 
   const allKeys = useMemo(() => {
-    const keys: (DictionaryKey & { dictId: string; dictName: string; isBuiltin: boolean })[] = [];
+    const keys: (DictionaryKey & { dictId: string; dictName: string; isBuiltin: boolean; isRecommended: boolean })[] = [];
     dictionaries.forEach(d => {
-      // FIX: Add safe check for dictionaryId
       const dictId = d.dictionaryId || 'unknown';
       const isBuiltin = dictId.startsWith('canon.');
       d.keys.forEach(k => {
@@ -31,17 +33,22 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
           ...k, 
           dictId: dictId, 
           dictName: dictId.split('.').slice(-1)[0].toUpperCase(),
-          isBuiltin
+          isBuiltin,
+          isRecommended: recommendedKeyIds.includes(k.keyId)
         });
       });
     });
-    return keys;
-  }, [dictionaries, filterKind]);
+    // Sort: Recommended first, then by Alias
+    return keys.sort((a, b) => {
+      if (a.isRecommended && !b.isRecommended) return -1;
+      if (!a.isRecommended && b.isRecommended) return 1;
+      return (a.alias || '').localeCompare(b.alias || '');
+    });
+  }, [dictionaries, filterKind, recommendedKeyIds]);
 
   const filteredKeys = useMemo(() => {
     const s = search.toLowerCase();
     return allKeys.filter(k => {
-      // FIX: Add safe check for path and alias
       const matchesSearch = 
         (k.alias || '').toLowerCase().includes(s) || 
         (k.path || '').toLowerCase().includes(s) ||
@@ -83,7 +90,7 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
         </select>
       </div>
 
-      <div className="max-h-[220px] overflow-y-auto border border-zinc-800 rounded bg-black/40 scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="max-h-[260px] overflow-y-auto border border-zinc-800 rounded bg-black/40 scrollbar-thin scrollbar-thumb-zinc-800">
         {filteredKeys.length > 0 ? (
           filteredKeys.map(k => (
             <button
@@ -92,9 +99,14 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
               className={`w-full text-left px-3 py-2.5 hover:bg-zinc-800 flex flex-col transition-all border-l-2 relative overflow-hidden group ${selectedKeyId === k.keyId ? 'border-blue-500 bg-blue-500/5' : 'border-transparent'}`}
             >
               <div className="flex justify-between items-center z-10">
-                <span className={`text-[11px] font-bold tracking-tight ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
-                  {k.alias}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-bold tracking-tight ${selectedKeyId === k.keyId ? 'text-blue-400' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
+                    {k.alias}
+                  </span>
+                  {k.isRecommended && (
+                    <span className="text-[7px] bg-blue-600/20 text-blue-400 px-1 rounded-sm border border-blue-500/30 font-black tracking-widest uppercase animate-pulse">Rec</span>
+                  )}
+                </div>
                 <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter shadow-sm ${k.isBuiltin ? 'bg-blue-900/40 text-blue-500 border border-blue-500/20' : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50'}`}>
                   {k.dictName}
                 </span>
