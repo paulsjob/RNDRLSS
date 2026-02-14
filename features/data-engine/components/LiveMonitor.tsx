@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { liveBus, LiveValueRecord } from '../../../shared/data-runtime';
 import { mlbSimulator, MLB_SCENARIOS } from '../services/MLBSimulator';
@@ -7,24 +8,50 @@ import { useDataStore, getProvenance, Provenance } from '../store/useDataStore';
 
 type DensityMode = 'compact' | 'standard' | 'verbose';
 
-const ProvenanceBadge: React.FC<{ origin: Provenance }> = ({ origin }) => {
+const SourceSignalBadge: React.FC<{ origin: Provenance }> = ({ origin }) => {
   const colors = {
-    LIVE: 'bg-green-500/10 text-green-500 border-green-500/20',
-    SIM: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    MANUAL: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    STALE: 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20',
-    INVALID: 'bg-red-500/10 text-red-500 border-red-500/20',
+    LIVE: 'bg-green-600 text-white',
+    SIM: 'bg-blue-600 text-white',
+    MANUAL: 'bg-amber-600 text-white',
+    PIPELINE: 'bg-purple-600 text-white',
+    STALE: 'bg-zinc-800 text-zinc-500',
+    INVALID: 'bg-red-600 text-white',
+    UNKNOWN: 'bg-zinc-900 text-zinc-700 border border-zinc-800'
   };
 
   return (
-    <span className={`text-[7px] font-black px-1 py-0.5 rounded border uppercase tracking-tighter transition-all duration-300 ${colors[origin]}`}>
+    <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter shadow-sm ${colors[origin] || colors.UNKNOWN}`}>
       {origin}
     </span>
   );
 };
 
+const StalenessTicker: React.FC<{ ts?: number }> = ({ ts }) => {
+  const [now, setNow] = useState(Date.now());
+  
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!ts) return null;
+  const diff = (now - ts) / 1000;
+  const isStale = diff > 10;
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className={`text-[8px] font-mono tabular-nums ${isStale ? 'text-red-500 font-bold' : 'text-zinc-600'}`}>
+        {diff < 1 ? '<1s' : `${diff.toFixed(0)}s`}
+      </span>
+      {isStale && (
+        <span className="text-[6px] font-black text-red-500 uppercase tracking-tighter border border-red-500/30 px-0.5 rounded bg-red-500/5">Stale</span>
+      )}
+    </div>
+  );
+};
+
 const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mode: DensityMode }> = ({ keyInfo, record, mode }) => {
-  const { isTruthMode, setSelection, selection } = useDataStore();
+  const { isTruthMode, setSelection, selection, monitor, togglePin } = useDataStore();
   const [isPulsing, setIsPulsing] = useState(false);
   const lastSeq = useRef(record?.seq || 0);
 
@@ -39,63 +66,47 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 
   const origin = getProvenance(record?.sourceId, record?.ts);
   const isSelected = selection.id === keyInfo.keyId;
+  const isPinned = monitor.pinnedKeyIds.has(keyInfo.keyId);
 
-  const staleLimit = 15000;
-  const isStale = record ? (Date.now() - record.ts > staleLimit) : true;
   const hasData = !!record;
-
-  if (mode === 'compact') {
-    return (
-      <div 
-        onClick={() => isTruthMode && setSelection('key', keyInfo.keyId, keyInfo.alias, keyInfo.canonicalPath)}
-        className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/40 border transition-all duration-500 cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.3)] scale-105 z-10' : isPulsing ? 'border-blue-500/60 bg-blue-500/5' : 'border-zinc-800/40'}`}
-        title={keyInfo.alias}
-      >
-        <span className={`text-[13px] font-mono font-black ${hasData ? (isStale ? 'text-zinc-500' : 'text-blue-400') : 'text-zinc-800'}`}>
-          {hasData ? (typeof record!.value === 'boolean' ? (record!.value ? 'T' : 'F') : String(record!.value)) : '—'}
-        </span>
-        <span className="text-[7px] text-zinc-600 font-bold uppercase tracking-tighter truncate w-full text-center">{keyInfo.alias}</span>
-        {isTruthMode && <div className="mt-1"><ProvenanceBadge origin={origin} /></div>}
-      </div>
-    );
-  }
 
   return (
     <div 
       onClick={() => isTruthMode && setSelection('key', keyInfo.keyId, keyInfo.alias, keyInfo.canonicalPath)}
-      className={`relative flex items-center justify-between p-3 rounded-xl bg-black/30 border transition-all duration-500 group cursor-pointer ${
-        isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : isPulsing ? 'border-blue-500/40 bg-blue-500/5' : 'border-zinc-800/40 hover:bg-zinc-800/20'
+      className={`relative flex items-center justify-between p-2.5 rounded-xl transition-all duration-300 group cursor-pointer border ${
+        isSelected ? 'bg-blue-600/10 border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 
+        isPulsing ? 'bg-blue-500/5 border-blue-500/30' : 
+        'bg-black/20 border-zinc-800/40 hover:bg-zinc-800/20 hover:border-zinc-700'
       }`}
     >
-      <div className="flex flex-col gap-0.5 overflow-hidden">
-        <div className="flex items-center gap-2">
-          <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-            !hasData ? 'bg-zinc-800' : 
-            isStale ? 'bg-amber-500' : 
-            'bg-green-500'
-          }`}></div>
-          <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight group-hover:text-zinc-300 transition-colors">
-            {keyInfo.alias}
-          </span>
-          {isTruthMode && <ProvenanceBadge origin={origin} />}
+      <div className="flex items-center gap-3 overflow-hidden">
+        <button 
+          onClick={(e) => { e.stopPropagation(); togglePin(keyInfo.keyId); }}
+          className={`shrink-0 transition-colors ${isPinned ? 'text-blue-400' : 'text-zinc-800 group-hover:text-zinc-600'}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill={isPinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </button>
+
+        <div className="flex flex-col gap-0.5 overflow-hidden">
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold uppercase tracking-tight truncate transition-colors ${isSelected ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-200'}`}>
+              {keyInfo.alias}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <SourceSignalBadge origin={origin} />
+            {mode === 'verbose' && (
+               <span className="text-[7px] text-zinc-700 font-mono truncate max-w-[120px]">{keyInfo.canonicalPath}</span>
+            )}
+          </div>
         </div>
-        {mode === 'verbose' && (
-          <span className="text-[8px] text-zinc-700 font-mono uppercase tracking-tighter truncate max-w-[180px]">
-            {keyInfo.canonicalPath}
-          </span>
-        )}
       </div>
       
-      <div className="text-right flex flex-col items-end">
-        <span className={`text-[12px] font-mono font-black transition-colors ${hasData ? (isStale ? 'text-zinc-500' : 'text-blue-400') : 'text-zinc-800'}`}>
+      <div className="text-right flex flex-col items-end shrink-0 pl-4">
+        <span className={`text-[13px] font-mono font-black tabular-nums transition-colors ${hasData ? (origin === 'STALE' ? 'text-zinc-600' : 'text-blue-400') : 'text-zinc-800'}`}>
           {hasData ? (typeof record!.value === 'boolean' ? (record!.value ? 'TRUE' : 'FALSE') : String(record!.value)) : '---'}
         </span>
-        {mode === 'verbose' && hasData && (
-          <div className="flex items-center gap-1.5 mt-0.5 opacity-60">
-            <span className="text-[7px] text-zinc-600 font-mono">SEQ:{record!.seq % 1000}</span>
-            <span className="text-[7px] text-zinc-600 font-mono">{(Date.now() - record!.ts) / 1000}s</span>
-          </div>
-        )}
+        <StalenessTicker ts={record?.ts} />
       </div>
     </div>
   );
@@ -104,48 +115,67 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 export const LiveMonitor: React.FC = () => {
   const { 
     simController, 
-    startFeed, 
     pause, 
     stopAll, 
     playScenario, 
     resetToCleanStart,
     busState, 
     isTruthMode, 
-    nodes,
-    selection
+    monitor,
+    toggleSection,
+    setMonitorSearch,
+    setMonitorFilter
   } = useDataStore();
   
   const [density, setDensity] = useState<DensityMode>('standard');
-  const [lastMsg, setLastMsg] = useState<any>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    const unsub = liveBus.subscribeAll((msg) => {
-      setLastMsg(msg);
-      setTick(t => t + 1);
-    });
+    const unsub = liveBus.subscribeAll(() => setTick(t => t + 1));
     return unsub;
   }, []);
 
-  const handleStep = () => {
-    mlbSimulator.step();
-  };
+  const handleStep = () => mlbSimulator.step();
 
-  const eventRecord = liveBus.getValue(MLB_KEYS.GAME_EVENTS);
-  const events = Array.isArray(eventRecord?.value) ? [...eventRecord!.value].reverse() : [];
+  const allKeys = MLB_CANON_DICTIONARY.keys.filter(k => k.kind === 'state');
+  
+  const filteredKeys = useMemo(() => {
+    let list = allKeys;
+    if (monitor.searchQuery) {
+      const q = monitor.searchQuery.toLowerCase();
+      list = list.filter(k => k.alias.toLowerCase().includes(q) || k.canonicalPath.toLowerCase().includes(q));
+    }
+    if (monitor.filterType === 'pinned') {
+      list = list.filter(k => monitor.pinnedKeyIds.has(k.keyId));
+    } else if (monitor.filterType === 'recent') {
+      list = list.filter(k => {
+        const record = liveBus.getValue(k.keyId);
+        return record && Date.now() - record.ts < 15000;
+      });
+    }
+    return list;
+  }, [allKeys, monitor, liveBus.getVersion()]);
 
-  const onAirKeys = useMemo(() => {
-    return MLB_CANON_DICTIONARY.keys.filter(k => {
-      const record = liveBus.getValue(k.keyId);
-      return record && Date.now() - record.ts < 30000;
+  const groups = useMemo(() => {
+    const map: Record<string, typeof filteredKeys> = {};
+    filteredKeys.forEach(k => {
+      const g = k.scope || 'General';
+      if (!map[g]) map[g] = [];
+      map[g].push(k);
     });
-  }, [nodes, lastMsg]);
+    return map;
+  }, [filteredKeys]);
+
+  const pinnedKeysList = useMemo(() => 
+    allKeys.filter(k => monitor.pinnedKeyIds.has(k.keyId)),
+    [allKeys, monitor.pinnedKeyIds]
+  );
 
   const isSimRunning = simController.status === 'running';
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-zinc-950">
-      {/* VTR Controller Bar / Truth Indicator */}
+      {/* VTR Controller Bar */}
       <div className={`p-4 pt-12 border-b sticky top-0 z-20 space-y-4 shadow-xl transition-all duration-500 ${isTruthMode ? 'bg-blue-900/10 border-blue-500/40 backdrop-blur-xl' : 'bg-zinc-900/90 border-zinc-800 backdrop-blur-md'}`}>
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
@@ -176,109 +206,108 @@ export const LiveMonitor: React.FC = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
               </button>
             </div>
-
-            <div className="flex bg-black/50 border border-zinc-800 rounded-lg p-1">
-              {(['compact', 'standard', 'verbose'] as DensityMode[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDensity(d)}
-                  className={`w-7 h-7 flex items-center justify-center text-[10px] font-black uppercase rounded transition-all ${density === d ? 'bg-zinc-800 text-blue-400' : 'text-zinc-700 hover:text-zinc-500'}`}
-                >
-                  {d.charAt(0)}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
 
-        {isTruthMode ? (
-          <div className="bg-black/50 border border-blue-500/20 rounded-xl p-4 animate-in fade-in duration-500">
-             <div className="flex items-center justify-between mb-3 border-b border-blue-500/10 pb-2">
-               <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">On-Air Reality Snapshot</h4>
-               <span className="text-[8px] text-zinc-600 font-mono">ACTIVE FEED</span>
-             </div>
-             <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                {onAirKeys.slice(0, 6).map(k => {
-                  const record = liveBus.getValue(k.keyId);
-                  const provenance = getProvenance(record?.sourceId, record?.ts);
-                  return (
-                    <div key={k.keyId} className="flex items-center justify-between group">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <div className={`w-1 h-1 rounded-full ${provenance === 'LIVE' ? 'bg-green-500' : 'bg-zinc-600'}`}></div>
-                        <span className="text-[9px] text-zinc-400 font-bold uppercase truncate">{k.alias}</span>
-                      </div>
-                      <span className="text-[10px] font-mono text-zinc-300 font-black">{record?.value ?? '---'}</span>
-                    </div>
-                  );
-                })}
-             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center ml-1">
-                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block">Live Story Scenarios</span>
-                <button onClick={resetToCleanStart} className="text-[9px] font-black text-blue-400 hover:underline uppercase tracking-widest">Reset Demo</button>
+        {/* Filter Bar (ITEM 37) */}
+        <div className="flex flex-col gap-3">
+           <div className="relative">
+              <input 
+                type="text" 
+                placeholder="Search live signals..." 
+                value={monitor.searchQuery}
+                onChange={(e) => setMonitorSearch(e.target.value)}
+                className="w-full bg-black/60 border border-zinc-800 rounded-xl px-4 py-2 text-xs text-white focus:border-blue-500 outline-none pr-10 placeholder:text-zinc-700 font-medium transition-all"
+              />
+              <div className="absolute right-4 top-2.5 text-zinc-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {MLB_SCENARIOS.map(s => (
-                  <button key={s.id} onClick={() => playScenario(s.id)} className={`flex flex-col text-left p-3 border rounded-xl transition-all group ${simController.activeScenarioId === s.id ? 'bg-blue-600/20 border-blue-500' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800 hover:border-blue-500/30'}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm">{s.icon}</span>
-                      <span className={`text-[10px] font-black uppercase tracking-tight ${simController.activeScenarioId === s.id ? 'text-blue-400' : 'text-zinc-300'}`}>{s.label}</span>
-                    </div>
-                    <p className="text-[8px] text-zinc-600 font-medium leading-tight">{s.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+           </div>
+           <div className="flex gap-1 p-1 bg-black/40 border border-zinc-800 rounded-lg">
+              {(['all', 'pinned', 'recent'] as const).map(f => (
+                <button 
+                  key={f}
+                  onClick={() => setMonitorFilter(f)}
+                  className={`flex-1 py-1 rounded text-[9px] font-black uppercase tracking-widest transition-all ${monitor.filterType === f ? 'bg-zinc-800 text-blue-400' : 'text-zinc-600 hover:text-zinc-400'}`}
+                >
+                  {f}
+                </button>
+              ))}
+           </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
-        <section className="space-y-4">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">{isTruthMode ? 'Live Registry Proof' : 'Registry State'}</span>
-              <div className="h-px w-12 bg-zinc-800"></div>
+        
+        {/* Pinned Section (ITEM 37) */}
+        {pinnedKeysList.length > 0 && monitor.filterType !== 'pinned' && (
+          <section className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Pinned Signals</span>
+              <div className="h-px flex-1 bg-blue-500/20"></div>
             </div>
-          </div>
+            <div className="grid grid-cols-1 gap-2">
+              {pinnedKeysList.map(key => (
+                <LiveStateRow 
+                  key={key.keyId} 
+                  keyInfo={key} 
+                  record={liveBus.getValue(key.keyId)} 
+                  mode={density} 
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-          <div className={density === 'compact' ? 'grid grid-cols-4 gap-2' : 'grid grid-cols-1 gap-2'}>
-            {MLB_CANON_DICTIONARY.keys.filter(k => k.kind === 'state').map(key => (
-              <LiveStateRow 
-                key={key.keyId} 
-                keyInfo={key} 
-                record={liveBus.getValue(key.keyId)} 
-                mode={density} 
-              />
-            ))}
-          </div>
+        {/* Grouped Registry (ITEM 37) */}
+        <section className="space-y-4">
+          {Object.entries(groups).map(([section, keys]) => {
+            const isCollapsed = monitor.collapsedSections.has(section);
+            return (
+              <div key={section} className="space-y-2">
+                <button 
+                  onClick={() => toggleSection(section)}
+                  className="w-full flex items-center justify-between px-1 group"
+                >
+                   <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${isCollapsed ? 'text-zinc-700' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{section}</span>
+                    <div className={`h-px w-8 transition-colors ${isCollapsed ? 'bg-zinc-900' : 'bg-zinc-800'}`}></div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={`text-zinc-800 group-hover:text-zinc-600 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 gap-2 animate-in fade-in duration-300">
+                    {keys.map(key => (
+                      <LiveStateRow 
+                        key={key.keyId} 
+                        keyInfo={key} 
+                        record={liveBus.getValue(key.keyId)} 
+                        mode={density} 
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </section>
 
-        {!isTruthMode && (
-          <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between px-1">
-               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Producer Log</span>
-                <div className="h-px w-12 bg-zinc-800"></div>
-              </div>
+        {!isTruthMode && monitor.filterType === 'all' && (
+          <section className="space-y-4 pt-12 border-t border-zinc-900 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="flex justify-between items-center ml-1">
+              <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block">Simulation Control</span>
+              <button onClick={resetToCleanStart} className="text-[9px] font-black text-blue-400 hover:underline uppercase tracking-widest">Reset Demo</button>
             </div>
-
-            <div className="space-y-2">
-              {events.slice(0, 20).map((ev: any) => (
-                <div key={ev.seq} className="bg-black/60 rounded-xl p-3 border border-zinc-800/60 flex justify-between items-center transition-all">
-                  <div className="flex flex-col gap-1 overflow-hidden">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[8px] px-2 py-0.5 font-black rounded border uppercase tracking-widest ${ev.payload?.event === 'SCENARIO_LOADED' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
-                        {ev.payload?.event || 'DATA'}
-                      </span>
-                      <span className="text-[11px] text-zinc-100 font-bold tracking-tight truncate">{ev.payload?.scenario || ev.payload?.score || 'State Update'}</span>
-                    </div>
+            <div className="grid grid-cols-2 gap-2">
+              {MLB_SCENARIOS.map(s => (
+                <button key={s.id} onClick={() => playScenario(s.id)} className={`flex flex-col text-left p-3 border rounded-xl transition-all group ${simController.activeScenarioId === s.id ? 'bg-blue-600/20 border-blue-500' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800 hover:border-blue-500/30'}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm">{s.icon}</span>
+                    <span className={`text-[10px] font-black uppercase tracking-tight ${simController.activeScenarioId === s.id ? 'text-blue-400' : 'text-zinc-300'}`}>{s.label}</span>
                   </div>
-                  <span className="text-[9px] text-zinc-700 font-mono">{new Date(ev.ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                </div>
+                  <p className="text-[8px] text-zinc-600 font-medium leading-tight">{s.description}</p>
+                </button>
               ))}
             </div>
           </section>
@@ -293,8 +322,8 @@ export const LiveMonitor: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-black text-zinc-700 uppercase">Logic Tier:</span>
-          <span className="text-[10px] font-mono font-bold text-blue-400">Stable-Alpha</span>
+          <span className="text-[9px] font-black text-zinc-700 uppercase">Signals:</span>
+          <span className="text-[10px] font-mono font-bold text-blue-400">{filteredKeys.length} active</span>
         </div>
       </div>
     </div>

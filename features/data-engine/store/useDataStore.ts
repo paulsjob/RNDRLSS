@@ -41,7 +41,7 @@ export type DeploymentStatus = 'idle' | 'deploying' | 'success';
 export type SimStatus = 'idle' | 'ready' | 'running' | 'paused' | 'error';
 export type SimMode = 'demoPipeline' | 'feedOnly' | 'scenario';
 export type BusState = 'idle' | 'streaming' | 'error';
-export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'STALE' | 'INVALID';
+export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'PIPELINE' | 'STALE' | 'INVALID' | 'UNKNOWN';
 
 export type SourceMode = 'static' | 'simulated' | 'manual' | 'demo';
 export type SelectionKind = 'node' | 'key' | 'registryObject';
@@ -66,6 +66,14 @@ interface DataState {
     id: string | null;
     label: string | null;
     canonicalPath: string | null;
+  };
+
+  // Live Monitor UI (ITEM 37)
+  monitor: {
+    pinnedKeyIds: Set<string>;
+    collapsedSections: Set<string>;
+    searchQuery: string;
+    filterType: 'all' | 'pinned' | 'recent';
   };
 
   // Golden Demo Coach (ITEM 34)
@@ -143,6 +151,12 @@ interface DataState {
   // Selection Actions
   setSelection: (kind: SelectionKind | null, id: string | null, label?: string, path?: string) => void;
 
+  // Monitor Actions (ITEM 37)
+  togglePin: (keyId: string) => void;
+  toggleSection: (section: string) => void;
+  setMonitorSearch: (query: string) => void;
+  setMonitorFilter: (filter: 'all' | 'pinned' | 'recent') => void;
+
   // Demo Coach Actions
   setCoachDismissed: (dismissed: boolean) => void;
   resetDemo: () => void;
@@ -196,6 +210,13 @@ export const useDataStore = create<DataState>((set, get) => ({
     canonicalPath: null,
   },
 
+  monitor: {
+    pinnedKeyIds: new Set(),
+    collapsedSections: new Set(),
+    searchQuery: '',
+    filterType: 'all',
+  },
+
   demoCoach: {
     isDismissed: false,
   },
@@ -239,6 +260,23 @@ export const useDataStore = create<DataState>((set, get) => ({
     endpointUrl: null,
     manifest: null,
   },
+
+  togglePin: (keyId) => set(state => {
+    const next = new Set(state.monitor.pinnedKeyIds);
+    if (next.has(keyId)) next.delete(keyId);
+    else next.add(keyId);
+    return { monitor: { ...state.monitor, pinnedKeyIds: next } };
+  }),
+
+  toggleSection: (section) => set(state => {
+    const next = new Set(state.monitor.collapsedSections);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    return { monitor: { ...state.monitor, collapsedSections: next } };
+  }),
+
+  setMonitorSearch: (searchQuery) => set(state => ({ monitor: { ...state.monitor, searchQuery } })),
+  setMonitorFilter: (filterType) => set(state => ({ monitor: { ...state.monitor, filterType } })),
 
   setSelection: (kind, id, label, path) => {
     set({ 
@@ -795,13 +833,15 @@ setTimeout(() => {
   useDataStore.getState().loadFromOrg('org_default');
 }, 0);
 
-// Global Helper for Provenance
+// Global Helper for Provenance (ITEM 37 Extended)
 export const getProvenance = (sourceId?: string, ts?: number): Provenance => {
-  if (!sourceId) return 'STALE';
-  if (ts && Date.now() - ts > 15000) return 'STALE';
+  if (!sourceId) return 'UNKNOWN';
+  if (ts && Date.now() - ts > 30000) return 'STALE';
   if (sourceId.startsWith('sim_')) return 'SIM';
   if (sourceId.startsWith('demo_')) return 'SIM';
   if (sourceId.startsWith('console_')) return 'MANUAL';
+  if (sourceId.startsWith('manual_')) return 'MANUAL';
+  if (sourceId.startsWith('golden_')) return 'PIPELINE';
   if (sourceId.includes('v1') || sourceId.includes('hub')) return 'LIVE';
-  return 'LIVE';
+  return 'UNKNOWN';
 };
