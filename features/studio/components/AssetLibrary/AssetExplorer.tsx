@@ -3,6 +3,10 @@ import { useAssetStore, Asset } from '../../store/useAssetStore';
 import { useStudioStore } from '../../store/useStudioStore';
 import { Button } from '../../../../shared/components/Button';
 import { NewFolderModal } from './NewFolderModal';
+import { ShareFolderModal } from './ShareFolderModal';
+import { RenameAssetModal } from './RenameAssetModal';
+import { DeleteAssetModal } from './DeleteAssetModal';
+import { AssetContextMenu } from './AssetContextMenu';
 
 export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { assets, currentFolderId, setCurrentFolderId, setCreateModalOpen, viewMode, setViewMode } = useAssetStore();
@@ -16,7 +20,6 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
       setCurrentFolderId(asset.id);
     } else {
       addAssetLayer(asset);
-      // We don't necessarily close the explorer so the user can add multiple assets
     }
   };
 
@@ -93,8 +96,18 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                    <div 
                      key={asset.id}
                      onClick={() => handleAssetClick(asset)}
-                     className="group flex flex-col items-center gap-4 p-5 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300"
+                     className="group flex flex-col items-center gap-4 p-5 rounded-2xl bg-zinc-900/30 border border-zinc-800/50 hover:bg-zinc-900 hover:border-blue-500/30 hover:shadow-[0_10px_30px_rgba(0,0,0,0.5)] cursor-pointer transition-all duration-300 relative"
                    >
+                     <div className="absolute top-2 right-2 z-20">
+                        <AssetContextMenu 
+                          asset={asset}
+                          trigger={
+                            <button className="w-7 h-7 flex items-center justify-center rounded-lg bg-black/50 border border-white/5 opacity-0 group-hover:opacity-100 hover:bg-zinc-800 hover:text-white transition-all">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                            </button>
+                          }
+                        />
+                     </div>
                      <div className="w-20 h-20 flex items-center justify-center rounded-2xl bg-zinc-950 border border-zinc-800 group-hover:bg-black group-hover:border-blue-500/50 shadow-inner transition-all duration-300">
                         {asset.type === 'folder' ? (
                           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500/40 group-hover:text-blue-500 transition-colors"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
@@ -126,6 +139,14 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                       </div>
                       <div className="flex items-center gap-6">
                         <span className="text-[10px] text-zinc-700 font-black uppercase tracking-widest bg-black px-2 py-0.5 rounded border border-zinc-800 group-hover:text-zinc-500 group-hover:border-zinc-700 transition-colors">{asset.type}</span>
+                        <AssetContextMenu 
+                          asset={asset}
+                          trigger={
+                            <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:text-white transition-all rounded-lg bg-zinc-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                            </button>
+                          }
+                        />
                       </div>
                     </div>
                   ))}
@@ -142,6 +163,9 @@ export const AssetExplorer: React.FC<{ onClose: () => void }> = ({ onClose }) =>
         </div>
 
         <NewFolderModal />
+        <ShareFolderModal />
+        <RenameAssetModal />
+        <DeleteAssetModal />
       </div>
     </div>
   );

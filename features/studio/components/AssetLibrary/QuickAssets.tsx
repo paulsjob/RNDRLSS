@@ -3,6 +3,10 @@ import { useAssetStore, Asset } from '../../store/useAssetStore';
 import { useStudioStore } from '../../store/useStudioStore';
 import { Button } from '../../../../shared/components/Button';
 import { NewFolderModal } from './NewFolderModal';
+import { ShareFolderModal } from './ShareFolderModal';
+import { RenameAssetModal } from './RenameAssetModal';
+import { DeleteAssetModal } from './DeleteAssetModal';
+import { AssetContextMenu } from './AssetContextMenu';
 
 export const QuickAssets: React.FC = () => {
   const { 
@@ -115,7 +119,7 @@ export const QuickAssets: React.FC = () => {
                     : 'items-center justify-between p-2 hover:bg-zinc-800 hover:border-zinc-700'
                 } ${asset.type === 'folder' ? 'text-zinc-300' : 'text-zinc-400'}`}
               >
-                <div className={`flex items-center gap-2.5 overflow-hidden ${quickViewMode === 'grid' ? 'flex-col' : 'flex-row'}`}>
+                <div className={`flex items-center gap-2.5 overflow-hidden w-full ${quickViewMode === 'grid' ? 'flex-col' : 'flex-row'}`}>
                   <span className={`shrink-0 ${asset.type === 'folder' ? 'text-blue-500/60' : 'text-zinc-600'} ${quickViewMode === 'grid' ? 'p-2 bg-black/40 rounded-lg mb-1' : ''}`}>
                     {asset.type === 'folder' ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width={quickViewMode === 'grid' ? "24" : "14"} height={quickViewMode === 'grid' ? "24" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>
@@ -123,7 +127,17 @@ export const QuickAssets: React.FC = () => {
                       <svg xmlns="http://www.w3.org/2000/svg" width={quickViewMode === 'grid' ? "24" : "14"} height={quickViewMode === 'grid' ? "24" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     )}
                   </span>
-                  <span className={`text-[11px] truncate font-medium ${quickViewMode === 'grid' ? 'text-center w-full' : ''}`}>{asset.name}</span>
+                  <div className={`flex-1 overflow-hidden flex items-center justify-between ${quickViewMode === 'grid' ? 'w-full px-1' : ''}`}>
+                    <span className={`text-[11px] truncate font-medium ${quickViewMode === 'grid' ? 'text-center w-full' : ''}`}>{asset.name}</span>
+                    <AssetContextMenu 
+                      asset={asset}
+                      trigger={
+                        <button className="p-1 opacity-0 group-hover:opacity-100 hover:text-white transition-all">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                      }
+                    />
+                  </div>
                 </div>
                 {asset.type === 'folder' && quickViewMode === 'list' && (
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700 group-hover:text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity"><path d="m9 18 6-6-6-6"/></svg>
@@ -140,6 +154,9 @@ export const QuickAssets: React.FC = () => {
       </div>
       
       <NewFolderModal />
+      <ShareFolderModal />
+      <RenameAssetModal />
+      <DeleteAssetModal />
     </div>
   );
 };

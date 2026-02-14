@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 
+export interface AssetPermission {
+  email: string;
+  role: 'viewer' | 'editor';
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -8,12 +13,17 @@ export interface Asset {
   url?: string;
   width?: number;
   height?: number;
+  visibility?: 'private' | 'team' | 'public';
+  permissions?: AssetPermission[];
 }
 
 interface AssetStore {
   assets: Asset[];
   currentFolderId: string | null;
   isCreateModalOpen: boolean;
+  sharingAssetId: string | null;
+  renamingAssetId: string | null;
+  deletingAssetId: string | null;
   viewMode: 'grid' | 'list';
   quickViewMode: 'grid' | 'list';
   filterType: 'all' | 'image' | 'video' | 'audio';
@@ -21,16 +31,35 @@ interface AssetStore {
   // Actions
   setCurrentFolderId: (id: string | null) => void;
   setCreateModalOpen: (open: boolean) => void;
+  setSharingAssetId: (id: string | null) => void;
+  setRenamingAssetId: (id: string | null) => void;
+  setDeletingAssetId: (id: string | null) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setQuickViewMode: (mode: 'grid' | 'list') => void;
   setFilterType: (type: 'all' | 'image' | 'video' | 'audio') => void;
   createFolder: (name: string) => void;
+  updateAssetPermissions: (id: string, visibility: 'private' | 'team' | 'public', permissions: AssetPermission[]) => void;
+  renameAsset: (id: string, newName: string) => void;
   deleteAsset: (id: string) => void;
 }
 
 const MOCK_ASSETS: Asset[] = [
-  { id: 'f-1', name: 'Backgrounds', type: 'folder', parentId: null },
-  { id: 'f-2', name: 'Team Logos', type: 'folder', parentId: null },
+  { 
+    id: 'f-1', 
+    name: 'Backgrounds', 
+    type: 'folder', 
+    parentId: null,
+    visibility: 'team',
+    permissions: [{ email: 'admin@renderless.io', role: 'editor' }]
+  },
+  { 
+    id: 'f-2', 
+    name: 'Team Logos', 
+    type: 'folder', 
+    parentId: null,
+    visibility: 'private',
+    permissions: []
+  },
   { 
     id: 'a-1', 
     name: 'Stadium Night', 
@@ -64,12 +93,18 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   assets: MOCK_ASSETS,
   currentFolderId: null,
   isCreateModalOpen: false,
+  sharingAssetId: null,
+  renamingAssetId: null,
+  deletingAssetId: null,
   viewMode: 'grid',
   quickViewMode: 'list',
   filterType: 'all',
 
   setCurrentFolderId: (id) => set({ currentFolderId: id }),
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
+  setSharingAssetId: (id) => set({ sharingAssetId: id }),
+  setRenamingAssetId: (id) => set({ renamingAssetId: id }),
+  setDeletingAssetId: (id) => set({ deletingAssetId: id }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setQuickViewMode: (mode) => set({ quickViewMode: mode }),
   setFilterType: (type) => set({ filterType: type }),
@@ -81,8 +116,6 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
     let finalName = cleanName;
     let counter = 2;
-    
-    // Find siblings in the same parent folder to check for duplicates
     const siblings = assets.filter(a => a.parentId === currentFolderId);
     
     while (siblings.some(s => s.name.toLowerCase() === finalName.toLowerCase())) {
@@ -94,7 +127,9 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
       id: `folder-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       name: finalName,
       type: 'folder',
-      parentId: currentFolderId
+      parentId: currentFolderId,
+      visibility: 'private',
+      permissions: []
     };
 
     set({ 
@@ -103,7 +138,17 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
     });
   },
 
+  updateAssetPermissions: (id, visibility, permissions) => set(state => ({
+    assets: state.assets.map(a => a.id === id ? { ...a, visibility, permissions } : a)
+  })),
+
+  renameAsset: (id, newName) => set(state => ({
+    assets: state.assets.map(a => a.id === id ? { ...a, name: newName } : a),
+    renamingAssetId: null
+  })),
+
   deleteAsset: (id) => set(state => ({
-    assets: state.assets.filter(a => a.id !== id)
+    assets: state.assets.filter(a => a.id !== id),
+    deletingAssetId: null
   }))
 }));
