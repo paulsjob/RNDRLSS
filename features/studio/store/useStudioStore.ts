@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { 
   GraphicTemplate, 
@@ -22,6 +23,7 @@ interface StudioState {
     rightPanelOpen: boolean;
     zoomLevel: number;
     activeResolution: keyof typeof RESOLUTIONS;
+    editingLayerId: string | null; // Track text editing mode
   };
   selection: {
     selectedLayerId: string | null;
@@ -34,6 +36,7 @@ interface StudioState {
   togglePanel: (panel: 'left' | 'right') => void;
   setZoom: (zoom: number) => void;
   setResolution: (res: keyof typeof RESOLUTIONS) => void;
+  setEditingLayerId: (id: string | null) => void; // Toggle text edit mode
   
   // Template Actions
   updateTemplateMetadata: (meta: Partial<GraphicTemplate['metadata']>) => void;
@@ -118,6 +121,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     rightPanelOpen: true,
     zoomLevel: 1,
     activeResolution: 'BROADCAST',
+    editingLayerId: null,
   },
   selection: {
     selectedLayerId: null,
@@ -148,6 +152,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   setResolution: (res) => set((state) => ({
     ui: { ...state.ui, activeResolution: res }
+  })),
+
+  setEditingLayerId: (id) => set((state) => ({
+    ui: { ...state.ui, editingLayerId: id }
   })),
 
   updateTemplateMetadata: (meta) => set((state) => ({
@@ -343,8 +351,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
 /**
  * LIVE DATA SYNC MANAGER
- * Listens to the LiveBus and updates the store state for bound layers.
- * This ensures that even legacy stage components see live data updates in content.text.
  */
 liveBus.subscribeAll((msg) => {
   const state = useStudioStore.getState();
@@ -358,7 +364,7 @@ liveBus.subscribeAll((msg) => {
   } else if (msg.type === 'delta') {
     msg.changes.forEach(c => { changedValues[c.keyId] = c.value; });
   } else {
-    return; // Events ignored for simple text binding
+    return;
   }
 
   // Find layers affected by these changes
@@ -366,7 +372,6 @@ liveBus.subscribeAll((msg) => {
   let hasUpdates = false;
 
   Object.entries(template.bindings).forEach(([bindingKey, value]) => {
-    // FIX: Safely extract keyId and transform, defaulting transform to 'none' if not present
     const parts = (value as string).split('|');
     const keyId = parts[0];
     const transform = parts[1] || 'none';
@@ -374,14 +379,13 @@ liveBus.subscribeAll((msg) => {
     if (changedValues[keyId] !== undefined) {
       const [layerId, property] = bindingKey.split('.');
       const layer = template.layers.find(l => l.id === layerId);
-      if (layer && property === 'text' && layer.type === LayerType.TEXT) {
+      
+      // Prevent live data from overwriting text while the user is manually editing it
+      if (layer && property === 'text' && layer.type === LayerType.TEXT && state.ui.editingLayerId !== layer.id) {
         const rawValue = changedValues[keyId];
         const processedValue = applyTransforms(rawValue, transform === 'none' ? [] : [transform]);
         
-        // Prepare content update
         const contentUpdate: any = { text: String(processedValue) };
-        
-        // Persist original static text if not already saved
         if ((layer.content as any).staticText === undefined) {
           contentUpdate.staticText = (layer.content as any).text;
         }
