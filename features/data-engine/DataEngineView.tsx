@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DataDictionaryBrowser } from './DataDictionaryBrowser';
 import { NodeCanvas } from './NodeCanvas';
@@ -12,17 +11,16 @@ import { Button } from '../../shared/components/Button';
 
 const PipelineHeader: React.FC = () => {
   const { 
-    activeAdapterId, 
-    availableAdapters, 
-    simState, 
+    simController,
     busState, 
     isTruthMode, 
     setTruthMode, 
-    goldenPath,
-    createDemoPipeline,
+    startDemoPipeline,
     nodes
   } = useDataStore();
-  const adapter = availableAdapters.find(a => a.id === activeAdapterId);
+
+  const isSimRunning = simController.status === 'running';
+  const isSimPaused = simController.status === 'paused';
 
   return (
     <div className={`h-12 border-b flex items-center justify-between px-6 shrink-0 z-[70] transition-colors duration-500 ${isTruthMode ? 'bg-zinc-950 border-blue-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
@@ -38,21 +36,21 @@ const PipelineHeader: React.FC = () => {
         
         <div className="h-4 w-px bg-zinc-800"></div>
 
-        {!isTruthMode && (
+        {!isTruthMode && simController.status === 'idle' && (
           <Button 
             size="sm" 
             variant="outline" 
-            onClick={createDemoPipeline}
+            onClick={startDemoPipeline}
             className="h-7 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/10"
           >
-            Create Demo Pipeline
+            Run Demo
           </Button>
         )}
         
         <div className="flex items-center gap-4">
-           <div className={`w-2 h-2 rounded-full ${simState === 'playing' ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+           <div className={`w-2 h-2 rounded-full ${isSimRunning ? 'bg-blue-500 animate-pulse' : isSimPaused ? 'bg-amber-500' : 'bg-zinc-700'}`}></div>
            <span className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">
-             {simState === 'playing' ? 'Live Feed Active' : 'Simulation Standby'}
+             {isSimRunning ? `SIM: ${simController.mode || 'ACTIVE'}` : isSimPaused ? 'SIM: PAUSED' : 'Simulation Standby'}
            </span>
         </div>
       </div>

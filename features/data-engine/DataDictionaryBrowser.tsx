@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDataStore, getProvenance, Provenance } from './store/useDataStore';
 import { resolvePath, normalizeValue } from './engine-logic';
@@ -39,7 +38,6 @@ const KeyPreviewTooltip: React.FC<{ value: any; label: string; x: number; y: num
 );
 
 export const DataDictionaryBrowser: React.FC = () => {
-  // Pull setWiringMode from the store to handle drag-and-drop wiring interactions.
   const { 
     availableAdapters, 
     activeAdapterId, 
@@ -49,8 +47,8 @@ export const DataDictionaryBrowser: React.FC = () => {
     builtinDictionaries,
     importedDictionaries,
     isTruthMode,
-    selectedTraceId,
-    setTraceId,
+    selection,
+    setSelection,
     setWiringMode
   } = useDataStore();
   
@@ -129,13 +127,13 @@ export const DataDictionaryBrowser: React.FC = () => {
               {(keys as DictionaryKey[]).map((key) => {
                 const liveValue = resolvePath(liveSnapshot, key.path);
                 const displayValue = normalizeValue(liveValue, key.dataType);
-                const isSelected = selectedTraceId === key.keyId;
+                const isSelected = selection.id === key.keyId;
 
                 return (
                   <div 
                     key={key.keyId}
                     draggable={!isTruthMode}
-                    onClick={() => isTruthMode && setTraceId(isSelected ? null : key.keyId)}
+                    onClick={() => setSelection('key', key.keyId, key.alias, key.canonicalPath)}
                     onDragStart={(e) => {
                       if (isTruthMode) return;
                       e.dataTransfer.setData('application/renderless-field', JSON.stringify(key));

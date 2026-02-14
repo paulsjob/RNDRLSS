@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ReactFlow, 
@@ -43,10 +42,10 @@ const NodeCanvasInner: React.FC = () => {
     isWiringMode,
     activeWiringSource,
     busState,
-    simState,
+    simController,
     isTruthMode,
-    selectedTraceId,
-    setTraceId
+    selection,
+    setSelection
   } = useDataStore();
 
   const [bindingConfirmation, setBindingConfirmation] = useState<string | null>(null);
@@ -89,7 +88,7 @@ const NodeCanvasInner: React.FC = () => {
     const isRecentlyUpdated = Date.now() - (node.data.lastUpdated || 0) < 800;
     const isWiringTarget = !isTruthMode && isWiringMode && activeWiringSource?.type === 'key';
     const hasError = !isTruthMode && validation.offendingNodeIds.has(node.id);
-    const isTraced = isTruthMode && selectedTraceId && (node.id === selectedTraceId || node.data.keyId === selectedTraceId);
+    const isTraced = selection.id === node.id || selection.id === node.data.keyId;
     
     const provenance = getProvenance(node.data.sourceId, node.data.lastUpdated);
 
@@ -99,7 +98,7 @@ const NodeCanvasInner: React.FC = () => {
         ...node.data,
         label: (
           <div 
-            onClick={() => isTruthMode && setTraceId(isTraced ? null : node.id)}
+            onClick={() => isTruthMode && setSelection('node', node.id, node.data.label)}
             className={`flex flex-col gap-1.5 transition-all ${isWiringTarget ? 'scale-105' : ''} ${isTruthMode ? 'cursor-pointer' : ''}`}
           >
             <div className="flex items-center justify-between border-b border-blue-500/20 pb-1 mb-1">
@@ -148,13 +147,13 @@ const NodeCanvasInner: React.FC = () => {
         borderColor: isTraced ? '#3b82f6' : hasError ? '#ef4444' : isRecentlyUpdated ? '#3b82f6' : (isWiringTarget ? '#3b82f6aa' : '#1e293b'),
         boxShadow: isTraced ? '0 0 30px rgba(59, 130, 246, 0.4)' : hasError ? '0 0 15px rgba(239, 68, 68, 0.2)' : isRecentlyUpdated ? '0 0 20px rgba(59, 130, 246, 0.4)' : (isWiringTarget ? '0 0 15px rgba(59, 130, 246, 0.2)' : '0 4px 10px rgba(0,0,0,0.5)'),
         transform: isTraced || isRecentlyUpdated ? 'scale(1.05)' : 'scale(1)',
-        opacity: isTruthMode && selectedTraceId && !isTraced ? 0.3 : 1
+        opacity: isTruthMode && selection.id && !isTraced ? 0.3 : 1
       }
     };
   });
 
   const edgesWithTruth = edges.map(edge => {
-    const isHighlighted = isTruthMode && selectedTraceId && (edge.source === selectedTraceId || edge.target === selectedTraceId);
+    const isHighlighted = isTruthMode && selection.id && (edge.source === selection.id || edge.target === selection.id);
     return {
       ...edge,
       animated: isHighlighted || edge.animated,
@@ -162,7 +161,7 @@ const NodeCanvasInner: React.FC = () => {
         ...edge.style,
         stroke: isHighlighted ? '#3b82f6' : edge.style?.stroke,
         strokeWidth: isHighlighted ? 4 : edge.style?.strokeWidth,
-        opacity: isTruthMode && selectedTraceId && !isHighlighted ? 0.1 : 1
+        opacity: isTruthMode && selection.id && !isHighlighted ? 0.1 : 1
       }
     };
   });
@@ -171,9 +170,9 @@ const NodeCanvasInner: React.FC = () => {
     let score = 0;
     if (validation.status === 'pass') score += 40;
     if (busState === 'streaming') score += 30;
-    if (simState === 'playing' || simState === 'paused') score += 30;
+    if (simController.status === 'running' || simController.status === 'paused') score += 30;
     return score;
-  }, [validation.status, busState, simState]);
+  }, [validation.status, busState, simController.status]);
 
   return (
     <div className={`flex-1 h-full transition-all duration-500 ${isTruthMode ? 'bg-black' : isWiringMode ? 'bg-blue-900/5' : 'bg-zinc-950'} relative`} onDragOver={(e) => !isTruthMode && e.preventDefault()} onDrop={onDrop}>
@@ -290,10 +289,15 @@ const NodeCanvasInner: React.FC = () => {
                    <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest z-20 group-hover:text-white transition-colors cursor-pointer">Live T+0ms</span>
                 </div>
                 <div className="flex justify-between items-center px-1">
-                   <p className="text-[9px] text-zinc-500 font-bold uppercase leading-relaxed max-w-[300px]">
-                     Tracing lineage for <span className="text-blue-400">{selectedTraceId ? `Object: ${selectedTraceId.slice(0, 8)}...` : 'Unselected'}</span>
-                   </p>
-                   <button onClick={() => setTraceId(null)} className="text-[9px] font-black text-zinc-400 hover:text-white uppercase tracking-widest">Clear Trace</button>
+                   <div className="flex flex-col gap-1">
+                      <p className="text-[9px] text-zinc-500 font-bold uppercase leading-relaxed">
+                        Selection Type: <span className="text-zinc-300">{selection.kind?.toUpperCase() || 'NONE'}</span>
+                      </p>
+                      <p className="text-[10px] text-blue-400 font-black tracking-tight uppercase">
+                        {selection.canonicalPath || selection.id || 'Nothing selected'}
+                      </p>
+                   </div>
+                   <button onClick={() => setSelection(null, null)} className="text-[9px] font-black text-zinc-400 hover:text-white uppercase tracking-widest">Clear Selection</button>
                 </div>
              </div>
           </Panel>
@@ -302,12 +306,6 @@ const NodeCanvasInner: React.FC = () => {
 
       {bindingConfirmation && !isTruthMode && (
         <BindingToast label={bindingConfirmation} onDone={() => setBindingConfirmation(null)} />
-      )}
-
-      {deployment.status !== 'idle' && (
-        <div className="absolute inset-0 z-[100] bg-zinc-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
-          {/* ... existing deployment UI remains ... */}
-        </div>
       )}
     </div>
   );

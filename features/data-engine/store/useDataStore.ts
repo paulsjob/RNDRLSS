@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { 
   Connection, 
@@ -14,12 +13,13 @@ import {
   addEdge 
 } from 'reactflow';
 import { DataAdapter } from '../../../shared/types';
-import { Dictionary, MappingSpec, KeyId, KeyKind } from '../../../contract/types';
+import { Dictionary, MappingSpec, KeyId } from '../../../contract/types';
 import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
 import { MLB_CANON_DICTIONARY, MLB_KEYS } from '../../../contract/dictionaries/mlb';
 import { liveBus } from '../../../shared/data-runtime';
+import { mlbSimulator } from '../services/MLBSimulator';
 
 const ADAPTERS: DataAdapter[] = [
   new SportsAdapter(),
@@ -29,11 +29,13 @@ const ADAPTERS: DataAdapter[] = [
 
 export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
-export type SimState = 'stopped' | 'playing' | 'paused';
+export type SimStatus = 'idle' | 'ready' | 'running' | 'paused' | 'error';
+export type SimMode = 'demoPipeline' | 'feedOnly' | 'scenario';
 export type BusState = 'idle' | 'streaming' | 'error';
 export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'STALE' | 'INVALID';
 
 export type SourceMode = 'static' | 'simulated' | 'manual' | 'demo';
+export type SelectionKind = 'node' | 'key' | 'registryObject';
 
 interface DataState {
   orgId: string;
@@ -41,22 +43,35 @@ interface DataState {
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
   
-  // Golden Path Demo State (Item 31)
+  // Unified Simulation Controller (ITEM 33)
+  simController: {
+    status: SimStatus;
+    mode: SimMode | null;
+    activeScenarioId: string | null;
+    lastError: string | null;
+  };
+
+  // Unified Selection (ITEM 33)
+  selection: {
+    kind: SelectionKind | null;
+    id: string | null;
+    label: string | null;
+    canonicalPath: string | null;
+  };
+
+  // Golden Path Demo State
   goldenPath: {
     sourceMode: SourceMode;
     rawInput: string;
     transformedValue: any;
     isBound: boolean;
-    bindingTarget: string; // e.g. "Home Score"
-    simRunning: boolean;
-    simSpeed: 'slow' | 'normal' | 'fast';
+    bindingTarget: string;
     lastUpdateTs: number;
     error: string | null;
   };
 
-  // Minimal Demo State (Item 32)
+  // Minimal Demo State
   demoPipeline: {
-    isActive: boolean;
     timer: number;
     homeScore: number;
     awayScore: number;
@@ -67,7 +82,6 @@ interface DataState {
   selectedTraceId: string | null;
   
   // Pipeline State
-  simState: SimState;
   busState: BusState;
   
   isWiringMode: boolean;
@@ -97,23 +111,31 @@ interface DataState {
     manifestPreview: any;
   };
 
+  // Unified Simulation Actions
+  startDemoPipeline: () => void;
+  startFeed: () => void;
+  stopFeed: () => void;
+  playScenario: (scenarioId: string) => void;
+  pause: () => void;
+  stopAll: () => void;
+  resetToCleanStart: () => void;
+  runDemoTick: () => void;
+
+  // Selection Actions
+  setSelection: (kind: SelectionKind | null, id: string | null, label?: string, path?: string) => void;
+
   // Actions
   setGoldenPathSource: (mode: SourceMode) => void;
   updateRawInput: (val: string) => void;
-  toggleGoldenSim: () => void;
-  setGoldenSimSpeed: (speed: 'slow' | 'normal' | 'fast') => void;
   bindToGraphic: (target: string) => void;
   validateGoldenPath: () => void;
 
-  // Demo Actions
-  toggleDemoPipeline: (active: boolean) => void;
-  runDemoTick: () => void;
+  // Graph Actions
   createDemoPipeline: () => void;
   fixOrphanedNode: (nodeId: string) => void;
   fixAllOrphans: () => void;
   
   setOrgId: (id: string) => void;
-  setSimState: (state: SimState) => void;
   setBusState: (state: BusState) => void;
   setWiringMode: (active: boolean, source?: { id: string; type: 'key' | 'node'; label?: string }) => void;
   setTruthMode: (active: boolean) => void;
@@ -136,20 +158,31 @@ export const useDataStore = create<DataState>((set, get) => ({
   activeAdapterId: ADAPTERS[0].id,
   liveSnapshot: {},
   
+  simController: {
+    status: 'idle',
+    mode: null,
+    activeScenarioId: null,
+    lastError: null,
+  },
+
+  selection: {
+    kind: null,
+    id: null,
+    label: null,
+    canonicalPath: null,
+  },
+
   goldenPath: {
     sourceMode: 'demo',
     rawInput: '0',
     transformedValue: 0,
     isBound: false,
     bindingTarget: 'MLB Scorebug',
-    simRunning: false,
-    simSpeed: 'normal',
     lastUpdateTs: 0,
     error: null,
   },
 
   demoPipeline: {
-    isActive: false,
     timer: 900, // 15 mins in seconds
     homeScore: 3,
     awayScore: 1
@@ -157,7 +190,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   
   isTruthMode: false,
   selectedTraceId: null,
-  simState: 'stopped',
   busState: 'idle',
   isWiringMode: false,
   activeWiringSource: null,
@@ -179,77 +211,91 @@ export const useDataStore = create<DataState>((set, get) => ({
     manifestPreview: null,
   },
 
-  setGoldenPathSource: (sourceMode) => {
-    set(state => ({ goldenPath: { ...state.goldenPath, sourceMode, simRunning: false } }));
-  },
-
-  updateRawInput: (rawInput) => {
-    let transformedValue: any = rawInput;
-    try {
-      if (!isNaN(Number(rawInput)) && rawInput.trim() !== '') {
-        transformedValue = Number(rawInput);
-      } else {
-        transformedValue = JSON.parse(rawInput);
-      }
-    } catch (e) {
-      transformedValue = rawInput;
-    }
-
-    set(state => ({ 
-      goldenPath: { 
-        ...state.goldenPath, 
-        rawInput, 
-        transformedValue, 
-        lastUpdateTs: Date.now() 
-      } 
-    }));
-
-    liveBus.publish({
-      type: 'delta',
-      dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
-      dictionaryVersion: MLB_CANON_DICTIONARY.version,
-      sourceId: 'golden_path_demo',
-      seq: Date.now(),
-      ts: Date.now(),
-      changes: [{ keyId: MLB_KEYS.SCORE_HOME, value: transformedValue }]
+  setSelection: (kind, id, label, path) => {
+    set({ 
+      selection: { 
+        kind, 
+        id, 
+        label: label || null, 
+        canonicalPath: path || null 
+      },
+      selectedTraceId: id 
     });
   },
 
-  toggleGoldenSim: () => {
-    set(state => ({ goldenPath: { ...state.goldenPath, simRunning: !state.goldenPath.simRunning } }));
+  startDemoPipeline: () => {
+    get().stopAll();
+    demoIntervalId = setInterval(() => {
+      get().runDemoTick();
+    }, 1000);
+    set({ 
+      simController: { status: 'running', mode: 'demoPipeline', activeScenarioId: null, lastError: null },
+      busState: 'streaming'
+    });
   },
 
-  setGoldenSimSpeed: (simSpeed) => {
-    set(state => ({ goldenPath: { ...state.goldenPath, simSpeed } }));
+  startFeed: () => {
+    get().stopAll();
+    mlbSimulator.start();
+    set({ 
+      simController: { status: 'running', mode: 'feedOnly', activeScenarioId: null, lastError: null },
+      busState: 'streaming'
+    });
   },
 
-  bindToGraphic: (bindingTarget) => {
-    set(state => ({ goldenPath: { ...state.goldenPath, isBound: true, bindingTarget } }));
+  stopFeed: () => {
+    get().stopAll();
   },
 
-  validateGoldenPath: () => {
-    const { goldenPath } = get();
-    if (!goldenPath.isBound) {
-      set(state => ({ goldenPath: { ...state.goldenPath, error: "No graphic field is bound to this pipeline." } }));
-    } else {
-      set(state => ({ goldenPath: { ...state.goldenPath, error: null } }));
-      set(state => ({ validation: { ...state.validation, status: 'pass' } }));
+  playScenario: (scenarioId) => {
+    get().stopAll();
+    mlbSimulator.applyScenario(scenarioId);
+    mlbSimulator.start();
+    set({ 
+      simController: { status: 'running', mode: 'scenario', activeScenarioId: scenarioId, lastError: null },
+      busState: 'streaming'
+    });
+  },
+
+  pause: () => {
+    const { simController } = get();
+    if (simController.status === 'running') {
+      if (simController.mode === 'demoPipeline' && demoIntervalId) {
+        clearInterval(demoIntervalId);
+        demoIntervalId = null;
+      } else {
+        mlbSimulator.stop();
+      }
+      set({ simController: { ...simController, status: 'paused' } });
+    } else if (simController.status === 'paused') {
+      if (simController.mode === 'demoPipeline') {
+        demoIntervalId = setInterval(() => get().runDemoTick(), 1000);
+      } else {
+        mlbSimulator.start();
+      }
+      set({ simController: { ...simController, status: 'running' } });
     }
   },
 
-  toggleDemoPipeline: (active) => {
-    if (demoIntervalId) clearInterval(demoIntervalId);
-    
-    if (active) {
-      demoIntervalId = setInterval(() => {
-        get().runDemoTick();
-      }, 1000);
-      set({ simState: 'playing', busState: 'streaming' });
-    } else {
-      set({ simState: 'stopped', busState: 'idle' });
+  stopAll: () => {
+    if (demoIntervalId) {
+      clearInterval(demoIntervalId);
+      demoIntervalId = null;
     }
-    
-    set(state => ({ demoPipeline: { ...state.demoPipeline, isActive: active } }));
+    mlbSimulator.stop();
+    set({ 
+      simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null },
+      busState: 'idle'
+    });
+  },
+
+  resetToCleanStart: () => {
+    get().stopAll();
+    set({
+      demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
+      goldenPath: { ...get().goldenPath, lastUpdateTs: 0 }
+    });
+    get().startDemoPipeline();
   },
 
   runDemoTick: () => {
@@ -295,6 +341,56 @@ export const useDataStore = create<DataState>((set, get) => ({
         { keyId: MLB_KEYS.TEAM_AWAY_ABBR, value: 'NYY' }
       ]
     });
+  },
+
+  setGoldenPathSource: (sourceMode) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, sourceMode } }));
+  },
+
+  updateRawInput: (rawInput) => {
+    let transformedValue: any = rawInput;
+    try {
+      if (!isNaN(Number(rawInput)) && rawInput.trim() !== '') {
+        transformedValue = Number(rawInput);
+      } else {
+        transformedValue = JSON.parse(rawInput);
+      }
+    } catch (e) {
+      transformedValue = rawInput;
+    }
+
+    set(state => ({ 
+      goldenPath: { 
+        ...state.goldenPath, 
+        rawInput, 
+        transformedValue, 
+        lastUpdateTs: Date.now() 
+      } 
+    }));
+
+    liveBus.publish({
+      type: 'delta',
+      dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
+      dictionaryVersion: MLB_CANON_DICTIONARY.version,
+      sourceId: 'golden_path_demo',
+      seq: Date.now(),
+      ts: Date.now(),
+      changes: [{ keyId: MLB_KEYS.SCORE_HOME, value: transformedValue }]
+    });
+  },
+
+  bindToGraphic: (bindingTarget) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, isBound: true, bindingTarget } }));
+  },
+
+  validateGoldenPath: () => {
+    const { goldenPath } = get();
+    if (!goldenPath.isBound) {
+      set(state => ({ goldenPath: { ...state.goldenPath, error: "No graphic field is bound to this pipeline." } }));
+    } else {
+      set(state => ({ goldenPath: { ...state.goldenPath, error: null } }));
+      set(state => ({ validation: { ...state.validation, status: 'pass' } }));
+    }
   },
 
   createDemoPipeline: () => {
@@ -371,7 +467,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     validation.offendingNodeIds.forEach(id => get().fixOrphanedNode(id));
   },
 
-  setSimState: (simState) => set({ simState }),
   setBusState: (busState) => set({ busState }),
   setWiringMode: (active, source = null) => set({ isWiringMode: active, activeWiringSource: source }),
   setTruthMode: (isTruthMode) => set({ isTruthMode, isWiringMode: false, activeWiringSource: null }),

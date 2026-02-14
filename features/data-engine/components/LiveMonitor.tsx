@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { liveBus, LiveValueRecord } from '../../../shared/data-runtime';
 import { mlbSimulator, MLB_SCENARIOS } from '../services/MLBSimulator';
@@ -25,7 +24,7 @@ const ProvenanceBadge: React.FC<{ origin: Provenance }> = ({ origin }) => {
 };
 
 const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mode: DensityMode }> = ({ keyInfo, record, mode }) => {
-  const { isTruthMode, setTraceId, selectedTraceId } = useDataStore();
+  const { isTruthMode, setSelection, selection } = useDataStore();
   const [isPulsing, setIsPulsing] = useState(false);
   const lastSeq = useRef(record?.seq || 0);
 
@@ -39,7 +38,7 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
   }, [record]);
 
   const origin = getProvenance(record?.sourceId, record?.ts);
-  const isSelected = selectedTraceId === keyInfo.keyId;
+  const isSelected = selection.id === keyInfo.keyId;
 
   const staleLimit = 15000;
   const isStale = record ? (Date.now() - record.ts > staleLimit) : true;
@@ -48,7 +47,7 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
   if (mode === 'compact') {
     return (
       <div 
-        onClick={() => isTruthMode && setTraceId(isSelected ? null : keyInfo.keyId)}
+        onClick={() => isTruthMode && setSelection('key', keyInfo.keyId, keyInfo.alias, keyInfo.canonicalPath)}
         className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/40 border transition-all duration-500 cursor-pointer ${isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.3)] scale-105 z-10' : isPulsing ? 'border-blue-500/60 bg-blue-500/5' : 'border-zinc-800/40'}`}
         title={keyInfo.alias}
       >
@@ -63,7 +62,7 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 
   return (
     <div 
-      onClick={() => isTruthMode && setTraceId(isSelected ? null : keyInfo.keyId)}
+      onClick={() => isTruthMode && setSelection('key', keyInfo.keyId, keyInfo.alias, keyInfo.canonicalPath)}
       className={`relative flex items-center justify-between p-3 rounded-xl bg-black/30 border transition-all duration-500 group cursor-pointer ${
         isSelected ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : isPulsing ? 'border-blue-500/40 bg-blue-500/5' : 'border-zinc-800/40 hover:bg-zinc-800/20'
       }`}
@@ -103,7 +102,19 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 };
 
 export const LiveMonitor: React.FC = () => {
-  const { simState, setSimState, busState, isTruthMode, nodes, toggleDemoPipeline, demoPipeline } = useDataStore();
+  const { 
+    simController, 
+    startFeed, 
+    pause, 
+    stopAll, 
+    playScenario, 
+    resetToCleanStart,
+    busState, 
+    isTruthMode, 
+    nodes,
+    selection
+  } = useDataStore();
+  
   const [density, setDensity] = useState<DensityMode>('standard');
   const [lastMsg, setLastMsg] = useState<any>(null);
   const [, setTick] = useState(0);
@@ -116,45 +127,8 @@ export const LiveMonitor: React.FC = () => {
     return unsub;
   }, []);
 
-  const handleStart = () => {
-    if (demoPipeline.isActive) {
-      // already running demo pipeline
-    } else {
-      mlbSimulator.start();
-    }
-    setSimState('playing');
-  };
-
-  const handlePause = () => {
-    if (demoPipeline.isActive) {
-      toggleDemoPipeline(false);
-    } else {
-      mlbSimulator.stop();
-    }
-    setSimState('paused');
-  };
-
-  const handleStop = () => {
-    if (demoPipeline.isActive) {
-      toggleDemoPipeline(false);
-    } else {
-      mlbSimulator.stop();
-    }
-    setSimState('stopped');
-  };
-
   const handleStep = () => {
     mlbSimulator.step();
-    if (simState === 'stopped') setSimState('paused');
-  };
-
-  const applyScenario = (id: string) => {
-    mlbSimulator.applyScenario(id);
-    if (simState === 'stopped') setSimState('paused');
-  };
-
-  const handleCleanStart = () => {
-    toggleDemoPipeline(true);
   };
 
   const eventRecord = liveBus.getValue(MLB_KEYS.GAME_EVENTS);
@@ -167,6 +141,8 @@ export const LiveMonitor: React.FC = () => {
     });
   }, [nodes, lastMsg]);
 
+  const isSimRunning = simController.status === 'running';
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-zinc-950">
       {/* VTR Controller Bar / Truth Indicator */}
@@ -174,20 +150,20 @@ export const LiveMonitor: React.FC = () => {
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isTruthMode ? 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse' : simState === 'playing' ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${isTruthMode ? 'bg-blue-400 shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse' : isSimRunning ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
               <h3 className={`text-[12px] font-black uppercase tracking-widest ${isTruthMode ? 'text-blue-400' : 'text-zinc-100'}`}>
                 {isTruthMode ? 'Diagnostic Reality' : 'Story Control'}
               </h3>
             </div>
             <span className={`text-[8px] font-mono tracking-tighter mt-1 uppercase ${isTruthMode ? 'text-blue-500/60' : 'text-zinc-600'}`}>
-              {isTruthMode ? 'READ-ONLY REALITY MODE' : `${simState.toUpperCase()} MODE | CLUSTER ALPHA`}
+              {isTruthMode ? 'READ-ONLY REALITY MODE' : `${simController.status.toUpperCase()} | ${simController.mode || 'STANDBY'}`}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <div className={`flex bg-black border border-zinc-800 rounded-lg p-1 gap-1 transition-all ${isTruthMode ? 'opacity-30 grayscale pointer-events-none' : ''}`}>
-              <button onClick={simState === 'playing' ? handlePause : handleStart} className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${simState === 'playing' ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30' : 'bg-blue-600 text-white'}`}>
-                {simState === 'playing' ? (
+              <button onClick={pause} className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${isSimRunning ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30' : 'bg-blue-600 text-white'}`}>
+                {isSimRunning ? (
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 12 8-12 8V4z"/></svg>
@@ -195,6 +171,9 @@ export const LiveMonitor: React.FC = () => {
               </button>
               <button onClick={handleStep} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 8 4 4-4 4"/><path d="M2 12h20"/></svg>
+              </button>
+              <button onClick={stopAll} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 text-red-500 hover:bg-red-500/20 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
               </button>
             </div>
 
@@ -216,7 +195,7 @@ export const LiveMonitor: React.FC = () => {
           <div className="bg-black/50 border border-blue-500/20 rounded-xl p-4 animate-in fade-in duration-500">
              <div className="flex items-center justify-between mb-3 border-b border-blue-500/10 pb-2">
                <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest">On-Air Reality Snapshot</h4>
-               <span className="text-[8px] text-zinc-600 font-mono">ALL CHANNELS</span>
+               <span className="text-[8px] text-zinc-600 font-mono">ACTIVE FEED</span>
              </div>
              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                 {onAirKeys.slice(0, 6).map(k => {
@@ -233,33 +212,20 @@ export const LiveMonitor: React.FC = () => {
                   );
                 })}
              </div>
-             <div className="mt-4 flex items-center gap-2">
-                <span className="text-[8px] text-zinc-600 uppercase font-black">Downstream Consumers:</span>
-                <span className="text-[8px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-black border border-blue-500/20">Design Stage Alpha</span>
-                <span className="text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-black border border-green-500/20">Social Feed Edge</span>
-             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <button 
-              onClick={handleCleanStart}
-              className="w-full flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-500 rounded-2xl border border-blue-400/50 shadow-xl shadow-blue-900/20 transition-all group"
-            >
-              <div className="flex flex-col text-left">
-                <span className="text-[11px] font-black text-white uppercase tracking-widest">🚀 Clean Start Demo</span>
-                <p className="text-[9px] text-blue-100 font-bold leading-tight mt-0.5">Reset logic & start deterministic sim</p>
-              </div>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-
             <div className="space-y-2">
-              <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block ml-1">Live Story Scenarios</span>
+              <div className="flex justify-between items-center ml-1">
+                <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block">Live Story Scenarios</span>
+                <button onClick={resetToCleanStart} className="text-[9px] font-black text-blue-400 hover:underline uppercase tracking-widest">Reset Demo</button>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {MLB_SCENARIOS.map(s => (
-                  <button key={s.id} onClick={() => applyScenario(s.id)} className="flex flex-col text-left p-3 bg-black/40 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-blue-500/30 transition-all group">
+                  <button key={s.id} onClick={() => playScenario(s.id)} className={`flex flex-col text-left p-3 border rounded-xl transition-all group ${simController.activeScenarioId === s.id ? 'bg-blue-600/20 border-blue-500' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800 hover:border-blue-500/30'}`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm">{s.icon}</span>
-                      <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tight">{s.label}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-tight ${simController.activeScenarioId === s.id ? 'text-blue-400' : 'text-zinc-300'}`}>{s.label}</span>
                     </div>
                     <p className="text-[8px] text-zinc-600 font-medium leading-tight">{s.description}</p>
                   </button>
@@ -327,8 +293,8 @@ export const LiveMonitor: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[9px] font-black text-zinc-700 uppercase">Flow:</span>
-          <span className="text-[10px] font-mono font-bold text-blue-400">{nodes.length} Active</span>
+          <span className="text-[9px] font-black text-zinc-700 uppercase">Logic Tier:</span>
+          <span className="text-[10px] font-mono font-bold text-blue-400">Stable-Alpha</span>
         </div>
       </div>
     </div>
