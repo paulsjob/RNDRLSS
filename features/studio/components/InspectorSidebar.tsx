@@ -5,7 +5,7 @@ import { useDataStore } from '../../data-engine/store/useDataStore';
 import { LogicLayer, LayerType } from '../../../shared/types';
 import { useLiveValue } from '../../../shared/data-runtime/hooks';
 import { applyTransforms } from '../../../contract/transforms';
-import { KeyPicker } from '../../../shared/components/KeyPicker';
+import { BindingModal } from './BindingModal';
 import { dictionaryRegistry } from '../../../shared/data-runtime/DictionaryRegistry';
 import { Dictionary } from '../../../contract/types';
 
@@ -88,7 +88,8 @@ export const InspectorSidebar: React.FC = () => {
     return unsub;
   }, [orgId]);
 
-  const [isBindingMode, setIsBindingMode] = useState(false);
+  const [isBindingModalOpen, setIsBindingModalOpen] = useState(false);
+  const [showSuccessBadge, setShowSuccessBadge] = useState(false);
 
   const selectedLayerId = selection.selectedLayerId;
   const layer = currentTemplate?.layers.find(l => l.id === selectedLayerId);
@@ -144,6 +145,16 @@ export const InspectorSidebar: React.FC = () => {
 
   const transforms = boundTransform === 'none' ? [] : [boundTransform];
 
+  const handleBindConfirm = (keyId: string, transform: string) => {
+    setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', keyId || null, transform);
+    setIsBindingModalOpen(false);
+    
+    if (keyId) {
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    }
+  };
+
   return (
     <div className="w-[320px] h-full bg-zinc-900 border-l border-zinc-800 flex flex-col shadow-2xl">
       <div className="h-12 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/50">
@@ -182,88 +193,72 @@ export const InspectorSidebar: React.FC = () => {
           </div>
         </section>
 
-        <section className="bg-blue-600/5 p-5 rounded-3xl border border-blue-500/10 -mx-2 shadow-inner">
+        <section className="bg-blue-600/5 p-5 rounded-3xl border border-blue-500/10 -mx-2 shadow-inner transition-all duration-500 relative overflow-hidden">
+          {showSuccessBadge && (
+            <div className="absolute inset-0 bg-blue-600 z-50 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+               <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white mb-2"><polyline points="20 6 9 17 4 12"/></svg>
+               <span className="text-[10px] font-black uppercase tracking-widest text-white">Linked Successfully</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.3)]"></div>
               <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Data Integration</h4>
             </div>
             <button 
-              onClick={() => setIsBindingMode(!isBindingMode)}
+              onClick={() => setIsBindingModalOpen(true)}
               className="text-[9px] font-black text-zinc-600 hover:text-blue-400 uppercase tracking-widest transition-colors flex items-center gap-2 group"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-12 transition-transform"><path d="m18 5-3-3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-              {isBindingMode ? 'Cancel' : 'Connect'}
+              {boundKeyId ? 'Modify' : 'Connect'}
             </button>
           </div>
           
           <div className="space-y-5">
-            {isBindingMode ? (
-              <div className="animate-in fade-in zoom-in-95 duration-200">
-                <KeyPicker 
-                  dictionaries={availableDicts}
-                  selectedKeyId={boundKeyId}
-                  onSelect={(id) => {
-                    setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', id, boundTransform);
-                    setIsBindingMode(false);
-                  }}
-                />
+            {!boundKeyId ? (
+              <div className="py-8 text-center border-2 border-dashed border-zinc-800/60 rounded-2xl bg-black/30 group hover:border-blue-500/40 transition-all cursor-pointer" onClick={() => setIsBindingModalOpen(true)}>
+                <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 group-hover:text-white transition-colors"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                </div>
+                <span className="text-[10px] font-black text-zinc-600 group-hover:text-blue-500 transition-colors uppercase tracking-widest">Bind Live Key</span>
               </div>
             ) : (
-              <>
-                {!boundKeyId ? (
-                  <div className="py-8 text-center border-2 border-dashed border-zinc-800/60 rounded-2xl bg-black/30 group hover:border-blue-500/40 transition-all cursor-pointer" onClick={() => setIsBindingMode(true)}>
-                    <div className="w-8 h-8 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:bg-blue-600 group-hover:border-blue-500 transition-all">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-600 group-hover:text-white transition-colors"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+              <div className="space-y-4">
+                <div className={`bg-zinc-950 rounded-2xl px-5 py-4 flex items-center justify-between group border transition-all ${boundLookup ? 'border-zinc-800 hover:border-blue-500/40 hover:bg-zinc-900' : 'border-red-900/50 bg-red-950/5 hover:border-red-500/50'}`}>
+                  <div className="flex flex-col overflow-hidden gap-0.5">
+                    <span className={`text-[12px] font-black truncate tracking-tight ${boundLookup ? 'text-blue-400' : 'text-zinc-600 italic'}`}>
+                      {boundLookup?.key.alias || 'Orphaned Reference'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[8px] text-zinc-700 font-mono uppercase tracking-tighter">
+                        Bus: {boundLookup?.dictionary.dictionaryId.split('.').slice(-1)[0] || 'Unknown'}
+                      </span>
+                      {boundLookup && (
+                        <div className="w-1 h-1 rounded-full bg-green-500/50 animate-pulse"></div>
+                      )}
                     </div>
-                    <span className="text-[10px] font-black text-zinc-600 group-hover:text-blue-500 transition-colors uppercase tracking-widest">Bind Live Key</span>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className={`bg-zinc-950 rounded-2xl px-5 py-4 flex items-center justify-between group border transition-all ${boundLookup ? 'border-zinc-800 hover:border-blue-500/40 hover:bg-zinc-900' : 'border-red-900/50 bg-red-950/5 hover:border-red-500/50'}`}>
-                      <div className="flex flex-col overflow-hidden gap-0.5">
-                        <span className={`text-[12px] font-black truncate tracking-tight ${boundLookup ? 'text-blue-400' : 'text-zinc-600 italic'}`}>
-                          {boundLookup?.key.alias || 'Orphaned Reference'}
-                        </span>
-                        <div className="flex items-center gap-2">
-                           <span className="text-[8px] text-zinc-700 font-mono uppercase tracking-tighter">
-                            Bus: {boundLookup?.dictionary.dictionaryId.split('.').slice(-1)[0] || 'Unknown'}
-                          </span>
-                          {boundLookup && (
-                            <div className="w-1 h-1 rounded-full bg-green-500/50 animate-pulse"></div>
-                          )}
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', null)}
-                        className="p-2 text-zinc-800 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                        title="Remove Binding"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                      </button>
-                    </div>
+                  <button 
+                    onClick={() => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', null)}
+                    className="p-2 text-zinc-800 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                    title="Remove Binding"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  </button>
+                </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[9px] text-zinc-600 uppercase font-black tracking-widest ml-1">Live Transformer</label>
-                      <select 
-                        value={boundTransform}
-                        onChange={(e) => setBinding(layer.id, layer.type === LayerType.TEXT ? 'text' : 'color', boundKeyId, e.target.value)}
-                        className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-[10px] font-bold text-zinc-400 focus:border-blue-500 outline-none hover:border-zinc-700 transition-colors cursor-pointer"
-                      >
-                        <option value="none">None (Raw Output)</option>
-                        <option value="upper">UPPERCASE</option>
-                        <option value="lower">lowercase</option>
-                        <option value="fixed(0)">Fixed Decimals (0)</option>
-                        <option value="fixed(2)">Fixed Decimals (2)</option>
-                        <option value="pct">Percentage (0.5 -> 50%)</option>
-                      </select>
-                    </div>
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] text-zinc-600 uppercase font-black">Transformer</span>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{boundTransform === 'none' ? 'None' : boundTransform}</span>
                   </div>
-                )}
-              </>
+                  <button onClick={() => setIsBindingModalOpen(true)} className="text-[9px] font-bold text-blue-400 hover:underline">Change</button>
+                </div>
+              </div>
             )}
 
-            {boundKeyId && !isBindingMode && (
+            {boundKeyId && (
               <LiveValuePreview 
                 keyId={boundKeyId} 
                 transforms={transforms} 
@@ -272,6 +267,15 @@ export const InspectorSidebar: React.FC = () => {
           </div>
         </section>
       </div>
+
+      <BindingModal 
+        isOpen={isBindingModalOpen}
+        onClose={() => setIsBindingModalOpen(false)}
+        onConfirm={handleBindConfirm}
+        initialKeyId={boundKeyId}
+        initialTransform={boundTransform}
+        targetLabel={layer.name}
+      />
     </div>
   );
 };

@@ -2,6 +2,8 @@
 import { liveBus } from '../../../shared/data-runtime';
 import { MLB_KEYS, MLB_CANON_DICTIONARY } from '../../../contract/dictionaries/mlb';
 
+export type SimulationPreset = 'inning_start' | 'bases_loaded' | 'close_game' | 'blowout';
+
 export class MLBSimulator {
   private interval: any = null;
   private seq = 0;
@@ -15,6 +17,72 @@ export class MLBSimulator {
     scoreAway: 0,
     bases: [false, false, false], // [1st, 2nd, 3rd]
   };
+
+  public applyPreset(preset: SimulationPreset) {
+    switch (preset) {
+      case 'inning_start':
+        this.state = {
+          inning: 1,
+          half: 'TOP',
+          balls: 0,
+          strikes: 0,
+          outs: 0,
+          scoreHome: 0,
+          scoreAway: 0,
+          bases: [false, false, false],
+        };
+        break;
+      case 'bases_loaded':
+        this.state = {
+          inning: 4,
+          half: 'BOT',
+          balls: 3,
+          strikes: 2,
+          outs: 2,
+          scoreHome: 2,
+          scoreAway: 1,
+          bases: [true, true, true],
+        };
+        break;
+      case 'close_game':
+        this.state = {
+          inning: 9,
+          half: 'TOP',
+          balls: 1,
+          strikes: 1,
+          outs: 1,
+          scoreHome: 4,
+          scoreAway: 3,
+          bases: [true, false, false],
+        };
+        break;
+      case 'blowout':
+        this.state = {
+          inning: 7,
+          half: 'BOT',
+          balls: 0,
+          strikes: 0,
+          outs: 0,
+          scoreHome: 12,
+          scoreAway: 2,
+          bases: [false, false, false],
+        };
+        break;
+    }
+    
+    this.publishSnapshot();
+    
+    liveBus.publish({
+      type: 'event',
+      dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
+      dictionaryVersion: MLB_CANON_DICTIONARY.version,
+      sourceId: 'sim_mlb_01',
+      seq: ++this.seq,
+      ts: Date.now(),
+      eventKeyId: MLB_KEYS.GAME_EVENTS,
+      payload: { event: 'PRESET_APPLIED', scenario: preset.toUpperCase().replace('_', ' ') }
+    });
+  }
 
   public start(tickRateMs = 1500) {
     if (this.interval) return;
@@ -36,17 +104,7 @@ export class MLBSimulator {
   }
 
   public reset() {
-    this.state = {
-      inning: 1,
-      half: 'TOP',
-      balls: 0,
-      strikes: 0,
-      outs: 0,
-      scoreHome: 0,
-      scoreAway: 0,
-      bases: [false, false, false],
-    };
-    this.publishSnapshot();
+    this.applyPreset('inning_start');
   }
 
   private tick() {
