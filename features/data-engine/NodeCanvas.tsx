@@ -35,6 +35,8 @@ const NodeCanvasInner: React.FC = () => {
     addNode, 
     validation, 
     validateGraph,
+    fixOrphanedNode,
+    fixAllOrphans,
     deployment,
     deployEndpoint,
     resetDeployment,
@@ -119,8 +121,16 @@ const NodeCanvasInner: React.FC = () => {
               </span>
             </div>
             {hasError && (
-              <div className="mt-1 text-[7px] font-black text-red-500 uppercase tracking-tighter bg-red-500/10 px-1 py-0.5 rounded leading-none">
-                Connection Required
+              <div className="mt-1 flex items-center justify-between gap-1">
+                <span className="text-[7px] font-black text-red-500 uppercase tracking-tighter bg-red-500/10 px-1 py-0.5 rounded leading-none">
+                  ORPHANED
+                </span>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); fixOrphanedNode(node.id); }}
+                  className="text-[7px] font-black text-blue-400 uppercase tracking-tighter hover:text-blue-300 underline"
+                >
+                  FIX
+                </button>
               </div>
             )}
             {isTruthMode && (
@@ -231,19 +241,32 @@ const NodeCanvasInner: React.FC = () => {
 
           {validation.status !== 'idle' && (
             <div className={`animate-in slide-in-from-top-4 duration-300 p-4 rounded-2xl border flex flex-col gap-3 shadow-xl ${validation.status === 'pass' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${validation.status === 'pass' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`}></div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${validation.status === 'pass' ? 'text-green-400' : 'text-red-400'}`}>
-                  {validation.status === 'pass' ? 'Graph Integrity: Valid' : 'Reality Warnings Found'}
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${validation.status === 'pass' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`}></div>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${validation.status === 'pass' ? 'text-green-400' : 'text-red-400'}`}>
+                    {validation.status === 'pass' ? 'Graph Integrity: Valid' : 'Reality Warnings Found'}
+                  </span>
+                </div>
+                {validation.status === 'fail' && (
+                  <button onClick={fixAllOrphans} className="text-[9px] font-black text-blue-400 uppercase tracking-widest hover:underline">Fix All</button>
+                )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin">
                 {validation.errors.map((err, i) => (
-                  <div key={i} className="flex flex-col gap-0.5">
+                  <div key={i} className="flex flex-col gap-1.5 p-2 bg-black/40 rounded-lg border border-red-500/10">
                     <div className="flex items-start gap-2 text-[9px] text-zinc-300 font-bold uppercase leading-tight">
                       <span className="text-red-500 mt-0.5 shrink-0">•</span>
                       {err.message}
                     </div>
+                    {err.nodeId && (
+                      <button 
+                        onClick={() => fixOrphanedNode(err.nodeId!)}
+                        className="text-[8px] font-black text-blue-400 uppercase tracking-widest self-end hover:bg-blue-600/10 px-2 py-0.5 rounded border border-blue-500/20"
+                      >
+                        Auto-Connect Node
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

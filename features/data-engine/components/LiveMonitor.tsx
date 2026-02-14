@@ -103,7 +103,7 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 };
 
 export const LiveMonitor: React.FC = () => {
-  const { simState, setSimState, busState, isTruthMode, nodes } = useDataStore();
+  const { simState, setSimState, busState, isTruthMode, nodes, toggleDemoPipeline, demoPipeline } = useDataStore();
   const [density, setDensity] = useState<DensityMode>('standard');
   const [lastMsg, setLastMsg] = useState<any>(null);
   const [, setTick] = useState(0);
@@ -117,17 +117,29 @@ export const LiveMonitor: React.FC = () => {
   }, []);
 
   const handleStart = () => {
-    mlbSimulator.start();
+    if (demoPipeline.isActive) {
+      // already running demo pipeline
+    } else {
+      mlbSimulator.start();
+    }
     setSimState('playing');
   };
 
   const handlePause = () => {
-    mlbSimulator.stop();
+    if (demoPipeline.isActive) {
+      toggleDemoPipeline(false);
+    } else {
+      mlbSimulator.stop();
+    }
     setSimState('paused');
   };
 
   const handleStop = () => {
-    mlbSimulator.stop();
+    if (demoPipeline.isActive) {
+      toggleDemoPipeline(false);
+    } else {
+      mlbSimulator.stop();
+    }
     setSimState('stopped');
   };
 
@@ -139,6 +151,10 @@ export const LiveMonitor: React.FC = () => {
   const applyScenario = (id: string) => {
     mlbSimulator.applyScenario(id);
     if (simState === 'stopped') setSimState('paused');
+  };
+
+  const handleCleanStart = () => {
+    toggleDemoPipeline(true);
   };
 
   const eventRecord = liveBus.getValue(MLB_KEYS.GAME_EVENTS);
@@ -224,18 +240,31 @@ export const LiveMonitor: React.FC = () => {
              </div>
           </div>
         ) : (
-          <div className="space-y-2">
-            <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block ml-1">Live Story Scenarios</span>
-            <div className="grid grid-cols-2 gap-2">
-              {MLB_SCENARIOS.map(s => (
-                <button key={s.id} onClick={() => applyScenario(s.id)} className="flex flex-col text-left p-3 bg-black/40 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-blue-500/30 transition-all group">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm">{s.icon}</span>
-                    <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tight">{s.label}</span>
-                  </div>
-                  <p className="text-[8px] text-zinc-600 font-medium leading-tight">{s.description}</p>
-                </button>
-              ))}
+          <div className="space-y-4">
+            <button 
+              onClick={handleCleanStart}
+              className="w-full flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-500 rounded-2xl border border-blue-400/50 shadow-xl shadow-blue-900/20 transition-all group"
+            >
+              <div className="flex flex-col text-left">
+                <span className="text-[11px] font-black text-white uppercase tracking-widest">🚀 Clean Start Demo</span>
+                <p className="text-[9px] text-blue-100 font-bold leading-tight mt-0.5">Reset logic & start deterministic sim</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-1 transition-transform"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+
+            <div className="space-y-2">
+              <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block ml-1">Live Story Scenarios</span>
+              <div className="grid grid-cols-2 gap-2">
+                {MLB_SCENARIOS.map(s => (
+                  <button key={s.id} onClick={() => applyScenario(s.id)} className="flex flex-col text-left p-3 bg-black/40 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-blue-500/30 transition-all group">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm">{s.icon}</span>
+                      <span className="text-[10px] font-black text-zinc-300 uppercase tracking-tight">{s.label}</span>
+                    </div>
+                    <p className="text-[8px] text-zinc-600 font-medium leading-tight">{s.description}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -296,6 +325,10 @@ export const LiveMonitor: React.FC = () => {
           <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${isTruthMode ? 'text-blue-500' : 'text-zinc-500'}`}>
             {isTruthMode ? 'REALITY PROOF ACTIVE' : `Distribution: ${busState.toUpperCase()}`}
           </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] font-black text-zinc-700 uppercase">Flow:</span>
+          <span className="text-[10px] font-mono font-bold text-blue-400">{nodes.length} Active</span>
         </div>
       </div>
     </div>

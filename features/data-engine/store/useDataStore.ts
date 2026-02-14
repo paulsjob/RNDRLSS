@@ -14,7 +14,7 @@ import {
   addEdge 
 } from 'reactflow';
 import { DataAdapter } from '../../../shared/types';
-import { Dictionary, MappingSpec, KeyId } from '../../../contract/types';
+import { Dictionary, MappingSpec, KeyId, KeyKind } from '../../../contract/types';
 import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
@@ -108,6 +108,9 @@ interface DataState {
   // Demo Actions
   toggleDemoPipeline: (active: boolean) => void;
   runDemoTick: () => void;
+  createDemoPipeline: () => void;
+  fixOrphanedNode: (nodeId: string) => void;
+  fixAllOrphans: () => void;
   
   setOrgId: (id: string) => void;
   setSimState: (state: SimState) => void;
@@ -286,9 +289,86 @@ export const useDataStore = create<DataState>((set, get) => ({
       changes: [
         { keyId: MLB_KEYS.SCORE_HOME, value: nextHome },
         { keyId: MLB_KEYS.SCORE_AWAY, value: nextAway },
-        { keyId: MLB_KEYS.GAME_CLOCK, value: clockStr }
+        { keyId: MLB_KEYS.GAME_CLOCK, value: clockStr },
+        { keyId: MLB_KEYS.GAME_STATUS, value: 'LIVE' },
+        { keyId: MLB_KEYS.TEAM_HOME_ABBR, value: 'LAD' },
+        { keyId: MLB_KEYS.TEAM_AWAY_ABBR, value: 'NYY' }
       ]
     });
+  },
+
+  createDemoPipeline: () => {
+    const demoNodes: Node[] = [
+      {
+        id: 'node-demo-source',
+        type: 'default',
+        data: { label: 'MLB Demo Source', keyId: MLB_KEYS.GAME_STATUS, value: 'LIVE' },
+        position: { x: 50, y: 150 },
+        style: { background: '#1e293b', color: '#60a5fa', border: '1px solid #3b82f6', borderRadius: '8px', fontSize: '11px', padding: '12px', width: 160 }
+      },
+      {
+        id: 'node-demo-logic',
+        type: 'default',
+        data: { label: 'Score Processor', keyId: MLB_KEYS.SCORE_HOME, value: 0 },
+        position: { x: 300, y: 150 },
+        style: { background: '#1e293b', color: '#60a5fa', border: '1px solid #3b82f6', borderRadius: '8px', fontSize: '11px', padding: '12px', width: 160 }
+      },
+      {
+        id: 'node-demo-bus',
+        type: 'default',
+        data: { label: 'Live Bus Outlet', keyId: MLB_KEYS.GAME_EVENTS, value: 'READY' },
+        position: { x: 550, y: 150 },
+        style: { background: '#0f172a', color: '#10b981', border: '1px solid #059669', borderRadius: '8px', fontSize: '11px', padding: '12px', width: 160 }
+      }
+    ];
+
+    const demoEdges: Edge[] = [
+      { id: 'edge-demo-1', source: 'node-demo-source', target: 'node-demo-logic', animated: true, style: { stroke: '#3b82f6', strokeWidth: 3 } },
+      { id: 'edge-demo-2', source: 'node-demo-logic', target: 'node-demo-bus', animated: true, style: { stroke: '#3b82f6', strokeWidth: 3 } }
+    ];
+
+    set({ nodes: demoNodes, edges: demoEdges });
+    get().saveToOrg();
+    get().validateGraph();
+  },
+
+  fixOrphanedNode: (nodeId) => {
+    const { nodes, edges } = get();
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    // Find first potential source node
+    const sourceNode = nodes.find(n => n.id !== nodeId && !edges.some(e => e.target === n.id));
+    if (sourceNode) {
+      const newEdge: Edge = {
+        id: `edge-auto-${Date.now()}`,
+        source: sourceNode.id,
+        target: nodeId,
+        animated: true,
+        style: { stroke: '#3b82f6', strokeWidth: 3 }
+      };
+      set({ edges: [...edges, newEdge] });
+    } else {
+      // If no obvious source, connect to "Source" type node if exists, or first node
+      const firstNode = nodes.find(n => n.id !== nodeId);
+      if (firstNode) {
+        const newEdge: Edge = {
+          id: `edge-auto-${Date.now()}`,
+          source: firstNode.id,
+          target: nodeId,
+          animated: true,
+          style: { stroke: '#3b82f6', strokeWidth: 3 }
+        };
+        set({ edges: [...edges, newEdge] });
+      }
+    }
+    get().saveToOrg();
+    get().validateGraph();
+  },
+
+  fixAllOrphans: () => {
+    const { validation } = get();
+    validation.offendingNodeIds.forEach(id => get().fixOrphanedNode(id));
   },
 
   setSimState: (simState) => set({ simState }),
@@ -346,7 +426,7 @@ export const useDataStore = create<DataState>((set, get) => ({
           const hasOutbound = edges.some(edge => edge.source === node.id);
           
           if (!hasInbound && !hasOutbound) {
-            errors.push({ message: `This data point exists but never reaches the live bus.`, nodeId: node.id });
+            errors.push({ message: `Node "${node.data.label}" is orphaned and never reaches the live bus.`, nodeId: node.id });
             offendingNodeIds.add(node.id);
           }
         });

@@ -1,5 +1,4 @@
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
@@ -14,10 +13,10 @@ export interface ErrorBoundaryState {
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Inherits from Component to provide error boundary lifecycle methods.
+ * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-// FIX: Using explicit Component import to ensure 'props' and 'state' are correctly inherited and recognized by the TypeScript compiler.
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// FIX: Using explicit React.Component to ensure 'props', 'state', and 'setState' are correctly inherited and recognized by the TypeScript compiler.
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // FIX: Explicitly initializing state within the constructor to ensure it is correctly associated with the React component context.
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -34,7 +33,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // FIX: Accessing featureName from this.props which is now recognized through inheritance.
+    // FIX: Accessing featureName from this.props which is now recognized through inheritance from React.Component.
     const { featureName } = this.props;
     console.group(`[Renderless Error] ${featureName || 'Component'}`);
     console.error("Error:", error);
@@ -44,12 +43,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: Correctly calling this.setState from the inherited Component base class to avoid instance reference errors.
+    // FIX: Correctly calling this.setState from the inherited React.Component base class to avoid instance reference errors.
     this.setState({ hasError: false, error: null });
   };
 
   public render(): ReactNode {
-    // FIX: Accessing state and props which are now properly recognized by the TypeScript compiler via Component inheritance.
+    // FIX: Accessing state and props which are now properly recognized by the TypeScript compiler via React.Component inheritance.
     const { hasError, error } = this.state;
     const { featureName, children } = this.props;
 

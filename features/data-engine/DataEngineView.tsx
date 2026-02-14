@@ -8,9 +8,20 @@ import { SnapshotManager } from './components/SnapshotManager';
 import { useDataStore } from './store/useDataStore';
 import { GoldenPathPanel } from './components/GoldenPathPanel';
 import { PipelineVisualizer } from './components/PipelineVisualizer';
+import { Button } from '../../shared/components/Button';
 
 const PipelineHeader: React.FC = () => {
-  const { activeAdapterId, availableAdapters, simState, busState, isTruthMode, setTruthMode, goldenPath } = useDataStore();
+  const { 
+    activeAdapterId, 
+    availableAdapters, 
+    simState, 
+    busState, 
+    isTruthMode, 
+    setTruthMode, 
+    goldenPath,
+    createDemoPipeline,
+    nodes
+  } = useDataStore();
   const adapter = availableAdapters.find(a => a.id === activeAdapterId);
 
   return (
@@ -26,16 +37,32 @@ const PipelineHeader: React.FC = () => {
         </div>
         
         <div className="h-4 w-px bg-zinc-800"></div>
+
+        {!isTruthMode && (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={createDemoPipeline}
+            className="h-7 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/10"
+          >
+            Create Demo Pipeline
+          </Button>
+        )}
         
         <div className="flex items-center gap-4">
-           <div className={`w-2 h-2 rounded-full ${goldenPath.simRunning ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
+           <div className={`w-2 h-2 rounded-full ${simState === 'playing' ? 'bg-blue-500 animate-pulse' : 'bg-zinc-700'}`}></div>
            <span className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">
-             {goldenPath.simRunning ? 'Live Feed Active' : 'Simulation Standby'}
+             {simState === 'playing' ? 'Live Feed Active' : 'Simulation Standby'}
            </span>
         </div>
       </div>
 
       <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 px-3 py-1 bg-black/40 border border-zinc-800 rounded-lg">
+           <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Flow:</span>
+           <span className="text-[10px] font-mono font-bold text-blue-400">{nodes.length} Nodes</span>
+        </div>
+
         {/* Truth Mode Toggle */}
         <div className="flex items-center gap-3 px-4 py-1.5 bg-black border border-zinc-800 rounded-full group cursor-pointer hover:border-blue-500/50 transition-all" onClick={() => setTruthMode(!isTruthMode)}>
            <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isTruthMode ? 'text-blue-400' : 'text-zinc-600'}`}>Truth Mode</span>
@@ -119,7 +146,7 @@ export const DataEngineView: React.FC = () => {
           </div>
           
           <div className="flex-1 relative bg-black/20">
-            <PipelineVisualizer />
+            <NodeCanvas />
           </div>
           
           <div className={`shrink-0 flex flex-col transition-all duration-500 ${isTruthMode ? 'opacity-30 grayscale pointer-events-none blur-[1px]' : ''}`}>
