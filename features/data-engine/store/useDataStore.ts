@@ -28,7 +28,15 @@ const ADAPTERS: DataAdapter[] = [
   new WeatherAdapter()
 ];
 
-export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
+export type ValidationType = 'error' | 'warning' | 'info';
+export interface ValidationResult {
+  id: string;
+  type: ValidationType;
+  message: string;
+  nodeId?: string;
+  keyId?: string;
+}
+
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
 export type SimStatus = 'idle' | 'ready' | 'running' | 'paused' | 'error';
 export type SimMode = 'demoPipeline' | 'feedOnly' | 'scenario';
@@ -106,15 +114,20 @@ interface DataState {
   addNode: (node: Node) => void;
 
   validation: {
-    status: ValidationStatus;
-    errors: { message: string; nodeId?: string }[];
+    status: 'idle' | 'validating' | 'pass' | 'fail';
+    results: ValidationResult[];
     lastValidated: number;
     offendingNodeIds: Set<string>;
   };
   deployment: {
     status: DeploymentStatus;
+    lastDeployedAt: number | null;
     endpointUrl: string | null;
-    manifestPreview: any;
+    manifest: {
+      nodes: number;
+      edges: number;
+      streamId: string;
+    } | null;
   };
 
   // Unified Simulation Actions
@@ -144,6 +157,8 @@ interface DataState {
   createDemoPipeline: () => void;
   fixOrphanedNode: (nodeId: string) => void;
   fixAllOrphans: () => void;
+  deployToEdge: () => void;
+  copyValidationReport: () => void;
   
   setOrgId: (id: string) => void;
   setBusState: (state: BusState) => void;
@@ -153,7 +168,6 @@ interface DataState {
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   validateGraph: () => void;
-  deployEndpoint: () => void;
   resetDeployment: () => void;
   saveToOrg: () => void;
   loadFromOrg: (id: string) => void;
@@ -215,14 +229,15 @@ export const useDataStore = create<DataState>((set, get) => ({
   edges: [],
   validation: {
     status: 'idle',
-    errors: [],
+    results: [],
     lastValidated: 0,
     offendingNodeIds: new Set(),
   },
   deployment: {
     status: 'idle',
+    lastDeployedAt: null,
     endpointUrl: null,
-    manifestPreview: null,
+    manifest: null,
   },
 
   setSelection: (kind, id, label, path) => {
@@ -243,7 +258,8 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().stopAll();
     set({
       selection: { kind: null, id: null, label: null, canonicalPath: null },
-      validation: { status: 'idle', errors: [], lastValidated: 0, offendingNodeIds: new Set() },
+      validation: { status: 'idle', results: [], lastValidated: 0, offendingNodeIds: new Set() },
+      deployment: { status: 'idle', lastDeployedAt: null, endpointUrl: null, manifest: null },
       isTruthMode: false,
       selectedTraceId: null,
       demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
@@ -407,8 +423,8 @@ export const useDataStore = create<DataState>((set, get) => ({
     });
   },
 
-  bindToGraphic: (bindingTarget) => {
-    set(state => ({ goldenPath: { ...state.goldenPath, isBound: true, bindingTarget } }));
+  bindToGraphic: (target) => {
+    set(state => ({ goldenPath: { ...state.goldenPath, isBound: true, bindingTarget: target } }));
   },
 
   validateGoldenPath: () => {
@@ -461,7 +477,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
-    // Find first potential source node
     const sourceNode = nodes.find(n => n.id !== nodeId && !edges.some(e => e.target === n.id));
     if (sourceNode) {
       const newEdge: Edge = {
@@ -473,7 +488,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       };
       set({ edges: [...edges, newEdge] });
     } else {
-      // If no obvious source, connect to "Source" type node if exists, or first node
       const firstNode = nodes.find(n => n.id !== nodeId);
       if (firstNode) {
         const newEdge: Edge = {
@@ -504,7 +518,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (get().isTruthMode) return;
     set({ 
       nodes: applyNodeChanges(changes, get().nodes),
-      validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() } 
+      validation: { ...get().validation, status: 'idle' } 
     });
     get().saveToOrg();
   },
@@ -512,7 +526,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     if (get().isTruthMode) return;
     set({ 
       edges: applyEdgeChanges(changes, get().edges),
-      validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() }
+      validation: { ...get().validation, status: 'idle' }
     });
     get().saveToOrg();
   },
@@ -534,66 +548,93 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   validateGraph: () => {
-    set({ validation: { ...get().validation, status: 'validating', errors: [], offendingNodeIds: new Set() } });
+    set({ validation: { ...get().validation, status: 'validating', results: [], offendingNodeIds: new Set() } });
     
     setTimeout(() => {
-      const { nodes, edges } = get();
-      const errors: { message: string; nodeId?: string }[] = [];
+      const { nodes, edges, simController } = get();
+      const results: ValidationResult[] = [];
       const offendingNodeIds = new Set<string>();
 
       if (nodes.length === 0) {
-        errors.push({ message: "This pipeline is empty. Connect a source to drive the live bus." });
+        results.push({ id: 'v-0', type: 'error', message: "This pipeline is empty. Connect a source to drive the live bus." });
       } else {
         nodes.forEach(node => {
           const hasInbound = edges.some(edge => edge.target === node.id);
           const hasOutbound = edges.some(edge => edge.source === node.id);
           
           if (!hasInbound && !hasOutbound) {
-            errors.push({ message: `Node "${node.data.label}" is orphaned and never reaches the live bus.`, nodeId: node.id });
+            results.push({ 
+              id: `v-${node.id}`, 
+              type: 'error', 
+              message: `Node "${node.data.label}" is orphaned and never reaches the live bus.`, 
+              nodeId: node.id 
+            });
             offendingNodeIds.add(node.id);
           }
         });
+
+        // Add some "Warnings" and "Info" based on simulation state
+        if (simController.status === 'idle') {
+          results.push({ 
+            id: 'v-w-1', 
+            type: 'warning', 
+            message: "Simulation is offline. Deployment will contain static snapshots only." 
+          });
+        }
+
+        results.push({ 
+          id: 'v-i-1', 
+          type: 'info', 
+          message: `Graph contains ${nodes.length} logic steps with ${edges.length} data routes.` 
+        });
       }
+
+      const hasErrors = results.some(r => r.type === 'error');
 
       set({ 
         validation: { 
-          status: errors.length > 0 ? 'fail' : 'pass', 
-          errors,
+          status: hasErrors ? 'fail' : 'pass', 
+          results,
           lastValidated: Date.now(),
           offendingNodeIds
         } 
       });
-    }, 1000);
+    }, 800);
   },
 
-  deployEndpoint: () => {
-    const { validation, nodes, edges } = get();
+  deployToEdge: () => {
+    const { validation, nodes, edges, orgId } = get();
     if (validation.status !== 'pass') return;
 
-    const manifest = {
-      timestamp: Date.now(),
-      activeKeys: nodes.map(n => n.data.keyId),
-      logicDepth: edges.length,
-      edgeNodes: ["CLUSTER_ALPHA_AWS_US_EAST"],
-      compression: "BROTLI_V2"
-    };
-
-    set({ deployment: { ...get().deployment, status: 'deploying', manifestPreview: manifest } });
+    set({ deployment: { ...get().deployment, status: 'deploying' } });
 
     setTimeout(() => {
-      const mockUrl = `https://api.renderless.io/v1/edge/${get().orgId}/live.json`;
+      const streamId = `strm_${Math.random().toString(36).substr(2, 9)}`;
+      const mockUrl = `https://api.renderless.io/v1/edge/${orgId}/topic/${streamId}`;
+      
       set({ 
         deployment: { 
-          ...get().deployment,
           status: 'success', 
-          endpointUrl: mockUrl 
+          lastDeployedAt: Date.now(),
+          endpointUrl: mockUrl,
+          manifest: {
+            nodes: nodes.length,
+            edges: edges.length,
+            streamId
+          }
         } 
       });
     }, 2000);
   },
 
+  copyValidationReport: () => {
+    const { validation } = get();
+    const report = validation.results.map(r => `[${r.type.toUpperCase()}] ${r.message}`).join('\n');
+    navigator.clipboard.writeText(`RENDERLESS VALIDATION REPORT - ${new Date().toISOString()}\n\n${report}`);
+  },
+
   resetDeployment: () => {
-    set({ deployment: { status: 'idle', endpointUrl: null, manifestPreview: null } });
+    set({ deployment: { status: 'idle', lastDeployedAt: null, endpointUrl: null, manifest: null } });
   },
 
   setOrgId: (id) => {

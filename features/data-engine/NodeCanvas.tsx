@@ -9,7 +9,7 @@ import {
   ReactFlowProvider 
 } from 'reactflow';
 import { Button } from '../../shared/components/Button';
-import { useDataStore, getProvenance } from './store/useDataStore';
+import { useDataStore, getProvenance, ValidationResult } from './store/useDataStore';
 
 const BindingToast: React.FC<{ label: string; onDone: () => void }> = ({ label, onDone }) => {
   useEffect(() => {
@@ -38,20 +38,22 @@ const NodeCanvasInner: React.FC = () => {
     fixOrphanedNode,
     fixAllOrphans,
     deployment,
-    deployEndpoint,
+    deployToEdge,
     resetDeployment,
+    copyValidationReport,
     isWiringMode,
     activeWiringSource,
     busState,
     simController,
     isTruthMode,
     selection,
-    setSelection
+    setSelection,
+    orgId
   } = useDataStore();
 
   const [bindingConfirmation, setBindingConfirmation] = useState<string | null>(null);
 
-  // ITEM 34: Derived step for highlighting
+  // Derived step for highlighting
   const currentStep = useMemo(() => {
     if (simController.status === 'idle') return 1;
     if (selection.id === null) return 2;
@@ -184,6 +186,12 @@ const NodeCanvasInner: React.FC = () => {
     return score;
   }, [validation.status, busState, simController.status]);
 
+  const sortedValidation = useMemo(() => {
+    const groups = { error: [] as ValidationResult[], warning: [] as ValidationResult[], info: [] as ValidationResult[] };
+    validation.results.forEach(r => groups[r.type].push(r));
+    return groups;
+  }, [validation.results]);
+
   return (
     <div className={`flex-1 h-full transition-all duration-500 ${isTruthMode ? 'bg-black' : isWiringMode ? 'bg-blue-900/5' : 'bg-zinc-950'} relative`} onDragOver={(e) => !isTruthMode && e.preventDefault()} onDrop={onDrop}>
       <style>{`
@@ -224,7 +232,7 @@ const NodeCanvasInner: React.FC = () => {
         <Background color={isTruthMode ? "#1e40af11" : isWiringMode ? "#1e40af22" : "#18181b"} gap={20} size={1} />
         <Controls className="bg-zinc-900 border-zinc-800 fill-white" />
         
-        <Panel position="top-right" className={`flex flex-col gap-3 max-w-[280px] transition-all duration-500 ${isTruthMode ? 'opacity-30 blur-[2px] pointer-events-none' : ''}`}>
+        <Panel position="top-right" className={`flex flex-col gap-3 max-w-[320px] transition-all duration-500 ${isTruthMode ? 'opacity-30 blur-[2px] pointer-events-none' : ''}`}>
           <div className={`flex flex-col gap-2 bg-zinc-900/90 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden relative transition-all ${currentStep === 3 ? 'highlight-guide' : ''}`}>
             <div className="flex items-center justify-between mb-2">
                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Logic Health</h4>
@@ -242,43 +250,70 @@ const NodeCanvasInner: React.FC = () => {
               <Button size="sm" variant={validation.status === 'pass' ? 'secondary' : 'primary'} onClick={validateGraph} disabled={validation.status === 'validating'} className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] ${currentStep === 3 ? 'bg-blue-600 text-white' : ''}`}>
                 {validation.status === 'validating' ? 'Scanning...' : 'Validate'}
               </Button>
-              <Button size="sm" variant="primary" onClick={deployEndpoint} disabled={validation.status !== 'pass' || deployment.status !== 'idle'} className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${validation.status === 'pass' ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-zinc-800 text-zinc-600'}`}>
-                Deploy
+              <Button size="sm" variant="primary" onClick={deployToEdge} disabled={validation.status !== 'pass' || deployment.status !== 'idle'} className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${validation.status === 'pass' ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-zinc-800 text-zinc-600'}`}>
+                {deployment.status === 'deploying' ? 'Deploying...' : 'Deploy'}
               </Button>
             </div>
           </div>
 
           {validation.status !== 'idle' && (
-            <div className={`animate-in slide-in-from-top-4 duration-300 p-4 rounded-2xl border flex flex-col gap-3 shadow-xl ${validation.status === 'pass' ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+            <div className={`animate-in slide-in-from-top-4 duration-300 p-4 rounded-2xl border flex flex-col gap-3 shadow-xl bg-black/60 backdrop-blur-md ${validation.status === 'pass' ? 'border-green-500/30' : 'border-red-500/30'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${validation.status === 'pass' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`}></div>
                   <span className={`text-[10px] font-black uppercase tracking-widest ${validation.status === 'pass' ? 'text-green-400' : 'text-red-400'}`}>
-                    {validation.status === 'pass' ? 'Graph Integrity: Valid' : 'Reality Warnings Found'}
+                    {validation.status === 'pass' ? 'Integrity Verified' : 'Logic Blockers Found'}
                   </span>
                 </div>
-                {validation.status === 'fail' && (
-                  <button onClick={fixAllOrphans} className="text-[9px] font-black text-blue-400 uppercase tracking-widest hover:underline">Fix All</button>
+                <button onClick={copyValidationReport} className="text-[8px] font-black text-zinc-600 hover:text-white uppercase tracking-widest transition-colors">Copy Report</button>
+              </div>
+
+              <div className="space-y-4 max-h-64 overflow-y-auto pr-2 scrollbar-thin">
+                {/* ERRORS */}
+                {sortedValidation.error.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[8px] font-black text-red-500/60 uppercase ml-1">Critical</span>
+                    {sortedValidation.error.map(err => (
+                      <div 
+                        key={err.id} 
+                        onClick={() => err.nodeId && setSelection('node', err.nodeId)}
+                        className={`p-2.5 bg-red-500/5 rounded-xl border border-red-500/10 flex flex-col gap-2 transition-all ${err.nodeId ? 'cursor-pointer hover:bg-red-500/10 hover:border-red-500/30' : ''}`}
+                      >
+                        <p className="text-[10px] text-red-100 font-medium leading-tight">{err.message}</p>
+                        {err.nodeId && <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter self-end">Target: {err.nodeId.slice(0, 8)}...</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* WARNINGS */}
+                {sortedValidation.warning.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[8px] font-black text-amber-500/60 uppercase ml-1">Warnings</span>
+                    {sortedValidation.warning.map(warn => (
+                      <div key={warn.id} className="p-2.5 bg-amber-500/5 rounded-xl border border-amber-500/10">
+                        <p className="text-[10px] text-amber-100 font-medium leading-tight">{warn.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* INFO */}
+                {sortedValidation.info.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[8px] font-black text-blue-500/60 uppercase ml-1">Context</span>
+                    {sortedValidation.info.map(info => (
+                      <div key={info.id} className="p-2.5 bg-blue-500/5 rounded-xl border border-blue-500/10">
+                        <p className="text-[10px] text-blue-100 font-medium leading-tight">{info.message}</p>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-2 scrollbar-thin">
-                {validation.errors.map((err, i) => (
-                  <div key={i} className="flex flex-col gap-1.5 p-2 bg-black/40 rounded-lg border border-red-500/10">
-                    <div className="flex items-start gap-2 text-[9px] text-zinc-300 font-bold uppercase leading-tight">
-                      <span className="text-red-500 mt-0.5 shrink-0">•</span>
-                      {err.message}
-                    </div>
-                    {err.nodeId && (
-                      <button 
-                        onClick={() => fixOrphanedNode(err.nodeId!)}
-                        className="text-[8px] font-black text-blue-400 uppercase tracking-widest self-end hover:bg-blue-600/10 px-2 py-0.5 rounded border border-blue-500/20"
-                      >
-                        Auto-Connect Node
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+
+              {validation.status === 'fail' && validation.offendingNodeIds.size > 0 && (
+                <button onClick={fixAllOrphans} className="w-full py-2 bg-blue-600 rounded-xl text-[10px] font-black text-white uppercase tracking-widest shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-all">Fix All Orphans</button>
+              )}
             </div>
           )}
         </Panel>
@@ -311,6 +346,85 @@ const NodeCanvasInner: React.FC = () => {
                 </div>
              </div>
           </Panel>
+        )}
+
+        {/* MOCK DEPLOYMENT OVERLAY */}
+        {deployment.status !== 'idle' && (
+          <div className="absolute inset-0 z-[300] bg-zinc-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-500">
+            <div className="w-full max-w-md p-8 bg-zinc-900 border border-zinc-800 rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col items-center text-center animate-in zoom-in-95 duration-300">
+              {deployment.status === 'deploying' ? (
+                <div className="space-y-6 w-full">
+                  <div className="w-20 h-20 bg-blue-600/10 rounded-full border border-blue-500/20 flex items-center justify-center mx-auto relative">
+                    <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M12 2v8"/><path d="m16 6-4 4-4-4"/><rect width="20" height="8" x="2" y="14" rx="2"/></svg>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white uppercase tracking-widest">Publishing Edge Logic</h3>
+                    <p className="text-xs text-zinc-500 font-medium">Syncing graph nodes to Global Delivery Bus...</p>
+                  </div>
+                  <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 animate-[loading_2s_ease-in-out_infinite]" style={{ width: '40%' }}></div>
+                  </div>
+                  <style>{`
+                    @keyframes loading {
+                      0% { transform: translateX(-100%); }
+                      100% { transform: translateX(300%); }
+                    }
+                  `}</style>
+                </div>
+              ) : (
+                <div className="space-y-8 w-full">
+                  <div className="w-20 h-20 bg-green-600/20 rounded-full border border-green-500/30 flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(34,197,94,0.2)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-green-500"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-white uppercase tracking-widest leading-none">Logic Live on Air</h3>
+                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">Renderless Edge | {orgId}</p>
+                  </div>
+
+                  <div className="p-6 bg-black border border-zinc-800 rounded-3xl space-y-5 text-left relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">Public Production Endpoint</span>
+                      <div className="flex items-center gap-3">
+                        <code className="text-[11px] font-mono text-blue-400 truncate flex-1">{deployment.endpointUrl}</code>
+                        <button 
+                          onClick={() => deployment.endpointUrl && navigator.clipboard.writeText(deployment.endpointUrl)}
+                          className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-600 hover:text-white transition-all"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 border-t border-zinc-800 pt-4">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-zinc-600 uppercase">Stream ID</span>
+                        <span className="text-[10px] text-zinc-300 font-mono">{deployment.manifest?.streamId}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-zinc-600 uppercase">Complexity</span>
+                        <span className="text-[10px] text-zinc-300 font-mono">{deployment.manifest?.nodes} Nodes | {deployment.manifest?.edges} Routes</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-blue-500/5 p-2 rounded-lg border border-blue-500/10">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span className="text-[9px] font-black text-blue-400/80 uppercase">Active Monitoring Enabled</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 w-full">
+                    <Button variant="secondary" className="flex-1 rounded-2xl h-12 uppercase tracking-widest font-black text-[10px]" onClick={resetDeployment}>Close Dashboard</Button>
+                    <Button variant="primary" className="flex-1 rounded-2xl h-12 uppercase tracking-widest font-black text-[10px] bg-blue-600 shadow-blue-600/20" onClick={resetDeployment}>Manage Stream</Button>
+                  </div>
+
+                  <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest italic">Note: Local Mock Environment Active</p>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </ReactFlow>
 

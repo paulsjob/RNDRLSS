@@ -14,21 +14,21 @@ import { Button } from '../../shared/components/Button';
  * ITEM 34: Golden Demo Coach Overlay
  */
 const GoldenDemoCoach: React.FC = () => {
-  const { simController, selection, validation, isTruthMode, resetDemo, demoCoach, setCoachDismissed } = useDataStore();
+  const { simController, selection, validation, isTruthMode, resetDemo, demoCoach, setCoachDismissed, deployment } = useDataStore();
   
   const currentStep = useMemo(() => {
     if (simController.status === 'idle') return 1;
     if (selection.id === null) return 2;
     if (validation.status !== 'pass') return 3;
-    if (!isTruthMode) return 4;
+    if (deployment.status !== 'success') return 4;
     return 5;
-  }, [simController.status, selection.id, validation.status, isTruthMode]);
+  }, [simController.status, selection.id, validation.status, deployment.status]);
 
   const steps = [
     { id: 1, label: 'Initiate Pipeline', desc: 'Click "Run Demo" to start simulation.', completed: currentStep > 1 },
     { id: 2, label: 'Audit Source', desc: 'Select a key from the Dictionary list.', completed: currentStep > 2 },
     { id: 3, label: 'Verify Logic', desc: 'Run "Validate" to check path integrity.', completed: currentStep > 3 },
-    { id: 4, label: 'Proof Reality', desc: 'Toggle "Truth Mode" for diagnostics.', completed: currentStep > 4 },
+    { id: 4, label: 'Go Live', desc: 'Deploy to Edge to publish the stream.', completed: currentStep > 4 },
   ];
 
   if (demoCoach.isDismissed) return null;
@@ -102,7 +102,8 @@ const PipelineHeader: React.FC = () => {
     startDemoPipeline,
     nodes,
     selection,
-    validation
+    validation,
+    deployment
   } = useDataStore();
 
   const isSimRunning = simController.status === 'running';
@@ -113,9 +114,9 @@ const PipelineHeader: React.FC = () => {
     if (simController.status === 'idle') return 1;
     if (selection.id === null) return 2;
     if (validation.status !== 'pass') return 3;
-    if (!isTruthMode) return 4;
+    if (deployment.status !== 'success') return 4;
     return 5;
-  }, [simController.status, selection.id, validation.status, isTruthMode]);
+  }, [simController.status, selection.id, validation.status, deployment.status]);
 
   return (
     <div className={`h-12 border-b flex items-center justify-between px-6 shrink-0 z-[70] transition-colors duration-500 ${isTruthMode ? 'bg-zinc-950 border-blue-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
@@ -168,9 +169,9 @@ const PipelineHeader: React.FC = () => {
            <span className="text-[10px] font-mono font-bold text-blue-400">{nodes.length} Nodes</span>
         </div>
 
-        {/* Truth Mode Toggle (Step 4 Highlight) */}
+        {/* Truth Mode Toggle */}
         <div 
-          className={`flex items-center gap-3 px-4 py-1.5 bg-black border border-zinc-800 rounded-full group cursor-pointer hover:border-blue-500/50 transition-all ${currentStep === 4 ? 'highlight-guide' : ''}`} 
+          className={`flex items-center gap-3 px-4 py-1.5 bg-black border border-zinc-800 rounded-full group cursor-pointer hover:border-blue-500/50 transition-all`} 
           onClick={() => setTruthMode(!isTruthMode)}
         >
            <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-colors ${isTruthMode ? 'text-blue-400' : 'text-zinc-600'}`}>Truth Mode</span>
