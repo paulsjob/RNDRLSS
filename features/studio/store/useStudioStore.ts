@@ -65,7 +65,7 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
       name: 'Background Bar',
       visible: true,
       locked: false,
-      transform: { x: 40, y: 40, width: 400, height: 60, opacity: 0.9, rotation: 0 },
+      transform: { x: 40, y: 40, width: 560, height: 60, opacity: 0.9, rotation: 0 },
       content: { color: '#18181b', borderRadius: 8 }
     },
     {
@@ -74,7 +74,7 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
       name: 'Home Team',
       visible: true,
       locked: false,
-      transform: { x: 60, y: 55, width: 100, height: 30, opacity: 1, rotation: 0 },
+      transform: { x: 60, y: 55, width: 80, height: 30, opacity: 1, rotation: 0 },
       content: { 
         text: 'LAD', 
         fontSize: 24, 
@@ -90,7 +90,7 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
       name: 'Home Score',
       visible: true,
       locked: false,
-      transform: { x: 170, y: 55, width: 40, height: 30, opacity: 1, rotation: 0 },
+      transform: { x: 150, y: 55, width: 40, height: 30, opacity: 1, rotation: 0 },
       content: { 
         text: '0', 
         fontSize: 24, 
@@ -99,11 +99,59 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
         fontFamily: 'Inter',
         textAlign: 'center' 
       }
+    },
+    {
+      id: 'layer-game-clock',
+      type: LayerType.TEXT,
+      name: 'Clock',
+      visible: true,
+      locked: false,
+      transform: { x: 210, y: 55, width: 120, height: 30, opacity: 1, rotation: 0 },
+      content: { 
+        text: '00:00', 
+        fontSize: 24, 
+        fontWeight: 'bold', 
+        color: '#fbbf24', 
+        fontFamily: 'Inter',
+        textAlign: 'center' 
+      }
+    },
+    {
+      id: 'layer-away-score',
+      type: LayerType.TEXT,
+      name: 'Away Score',
+      visible: true,
+      locked: false,
+      transform: { x: 350, y: 55, width: 40, height: 30, opacity: 1, rotation: 0 },
+      content: { 
+        text: '0', 
+        fontSize: 24, 
+        fontWeight: 'black', 
+        color: '#3b82f6', 
+        fontFamily: 'Inter',
+        textAlign: 'center' 
+      }
+    },
+    {
+      id: 'layer-away-team',
+      type: LayerType.TEXT,
+      name: 'Away Team',
+      visible: true,
+      locked: false,
+      transform: { x: 410, y: 55, width: 80, height: 30, opacity: 1, rotation: 0 },
+      content: { 
+        text: 'NYY', 
+        fontSize: 24, 
+        fontWeight: 'bold', 
+        color: '#ffffff', 
+        fontFamily: 'Inter',
+        textAlign: 'center' 
+      }
     }
   ],
   bindings: {
     'layer-home-team.text': MLB_KEYS.TEAM_HOME_ABBR,
-    'layer-home-score.text': MLB_KEYS.SCORE_HOME
+    'layer-away-team.text': MLB_KEYS.TEAM_AWAY_ABBR
   },
   overrides: {
     [AspectRatio.WIDE]: [],

@@ -33,7 +33,7 @@ export type SimState = 'stopped' | 'playing' | 'paused';
 export type BusState = 'idle' | 'streaming' | 'error';
 export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'STALE' | 'INVALID';
 
-export type SourceMode = 'static' | 'simulated' | 'manual';
+export type SourceMode = 'static' | 'simulated' | 'manual' | 'demo';
 
 interface DataState {
   orgId: string;
@@ -52,6 +52,14 @@ interface DataState {
     simSpeed: 'slow' | 'normal' | 'fast';
     lastUpdateTs: number;
     error: string | null;
+  };
+
+  // Minimal Demo State (Item 32)
+  demoPipeline: {
+    isActive: boolean;
+    timer: number;
+    homeScore: number;
+    awayScore: number;
   };
   
   // Truth Mode
@@ -96,6 +104,10 @@ interface DataState {
   setGoldenSimSpeed: (speed: 'slow' | 'normal' | 'fast') => void;
   bindToGraphic: (target: string) => void;
   validateGoldenPath: () => void;
+
+  // Demo Actions
+  toggleDemoPipeline: (active: boolean) => void;
+  runDemoTick: () => void;
   
   setOrgId: (id: string) => void;
   setSimState: (state: SimState) => void;
@@ -113,6 +125,8 @@ interface DataState {
   importBundleData: (data: { dictionaries: Dictionary[], mappings: MappingSpec[], graphs: any[] }) => any;
 }
 
+let demoIntervalId: any = null;
+
 export const useDataStore = create<DataState>((set, get) => ({
   orgId: 'org_default',
   availableAdapters: ADAPTERS,
@@ -120,15 +134,22 @@ export const useDataStore = create<DataState>((set, get) => ({
   liveSnapshot: {},
   
   goldenPath: {
-    sourceMode: 'manual',
-    rawInput: '10',
-    transformedValue: 10,
+    sourceMode: 'demo',
+    rawInput: '0',
+    transformedValue: 0,
     isBound: false,
-    bindingTarget: 'Home Score',
+    bindingTarget: 'MLB Scorebug',
     simRunning: false,
     simSpeed: 'normal',
     lastUpdateTs: 0,
     error: null,
+  },
+
+  demoPipeline: {
+    isActive: false,
+    timer: 900, // 15 mins in seconds
+    homeScore: 3,
+    awayScore: 1
   },
   
   isTruthMode: false,
@@ -162,11 +183,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   updateRawInput: (rawInput) => {
     let transformedValue: any = rawInput;
     try {
-      // Attempt numeric transform
       if (!isNaN(Number(rawInput)) && rawInput.trim() !== '') {
         transformedValue = Number(rawInput);
       } else {
-        // Attempt JSON transform
         transformedValue = JSON.parse(rawInput);
       }
     } catch (e) {
@@ -182,7 +201,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       } 
     }));
 
-    // Auto-publish to the "Home Score" key for the demo payoff
     liveBus.publish({
       type: 'delta',
       dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
@@ -195,7 +213,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   toggleGoldenSim: () => {
-    const { goldenPath } = get();
     set(state => ({ goldenPath: { ...state.goldenPath, simRunning: !state.goldenPath.simRunning } }));
   },
 
@@ -211,12 +228,67 @@ export const useDataStore = create<DataState>((set, get) => ({
     const { goldenPath } = get();
     if (!goldenPath.isBound) {
       set(state => ({ goldenPath: { ...state.goldenPath, error: "No graphic field is bound to this pipeline." } }));
-    } else if (goldenPath.lastUpdateTs === 0) {
-      set(state => ({ goldenPath: { ...state.goldenPath, error: "No data has flowed through the pipeline yet." } }));
     } else {
       set(state => ({ goldenPath: { ...state.goldenPath, error: null } }));
       set(state => ({ validation: { ...state.validation, status: 'pass' } }));
     }
+  },
+
+  toggleDemoPipeline: (active) => {
+    if (demoIntervalId) clearInterval(demoIntervalId);
+    
+    if (active) {
+      demoIntervalId = setInterval(() => {
+        get().runDemoTick();
+      }, 1000);
+      set({ simState: 'playing', busState: 'streaming' });
+    } else {
+      set({ simState: 'stopped', busState: 'idle' });
+    }
+    
+    set(state => ({ demoPipeline: { ...state.demoPipeline, isActive: active } }));
+  },
+
+  runDemoTick: () => {
+    const { demoPipeline } = get();
+    const nextTimer = Math.max(0, demoPipeline.timer - 1);
+    
+    // Logic: small chance to increment score
+    let nextHome = demoPipeline.homeScore;
+    let nextAway = demoPipeline.awayScore;
+    if (Math.random() > 0.98) nextHome++;
+    if (Math.random() > 0.99) nextAway++;
+
+    const minutes = Math.floor(nextTimer / 60);
+    const seconds = nextTimer % 60;
+    const clockStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+    set(state => ({ 
+      demoPipeline: { 
+        ...state.demoPipeline, 
+        timer: nextTimer,
+        homeScore: nextHome,
+        awayScore: nextAway
+      },
+      goldenPath: {
+        ...state.goldenPath,
+        lastUpdateTs: Date.now()
+      }
+    }));
+
+    liveBus.publish({
+      type: 'delta',
+      dictionaryId: MLB_CANON_DICTIONARY.dictionaryId,
+      dictionaryVersion: MLB_CANON_DICTIONARY.version,
+      sourceId: 'demo_simulation_v1',
+      seq: Date.now(),
+      ts: Date.now(),
+      changes: [
+        { keyId: MLB_KEYS.SCORE_HOME, value: nextHome },
+        { keyId: MLB_KEYS.SCORE_AWAY, value: nextAway },
+        { keyId: MLB_KEYS.GAME_CLOCK, value: clockStr }
+      ]
+    });
   },
 
   setSimState: (simState) => set({ simState }),
@@ -484,6 +556,7 @@ export const getProvenance = (sourceId?: string, ts?: number): Provenance => {
   if (!sourceId) return 'STALE';
   if (ts && Date.now() - ts > 15000) return 'STALE';
   if (sourceId.startsWith('sim_')) return 'SIM';
+  if (sourceId.startsWith('demo_')) return 'SIM';
   if (sourceId.startsWith('console_')) return 'MANUAL';
   if (sourceId.includes('v1') || sourceId.includes('hub')) return 'LIVE';
   return 'LIVE';
