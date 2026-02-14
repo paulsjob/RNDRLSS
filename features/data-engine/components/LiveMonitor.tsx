@@ -4,9 +4,10 @@ import { liveBus, LiveValueRecord } from '../../../shared/data-runtime';
 import { mlbSimulator, SimulationPreset } from '../services/MLBSimulator';
 import { MLB_CANON_DICTIONARY, MLB_KEYS } from '../../../contract/dictionaries/mlb';
 import { Button } from '../../../shared/components/Button';
+import { useDataStore } from '../store/useDataStore';
 
 export const LiveMonitor: React.FC = () => {
-  const [isSimulating, setIsSimulating] = useState(false);
+  const { simState, setSimState, busState, setBusState } = useDataStore();
   const [lastMsg, setLastMsg] = useState<any>(null);
   const [tick, setTick] = useState(0);
 
@@ -20,12 +21,12 @@ export const LiveMonitor: React.FC = () => {
 
   const handleStart = () => {
     mlbSimulator.start();
-    setIsSimulating(true);
+    setSimState('playing');
   };
 
   const handleStop = () => {
     mlbSimulator.stop();
-    setIsSimulating(false);
+    setSimState('stopped');
   };
 
   const handleReset = () => {
@@ -48,20 +49,20 @@ export const LiveMonitor: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
-      {/* Header / Simulation Studio */}
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md sticky top-0 z-20 space-y-4 shadow-xl">
+      {/* Simulation Studio Header */}
+      <div className="p-4 pt-12 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md sticky top-0 z-20 space-y-4 shadow-xl">
         <div className="flex justify-between items-center">
           <div>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
-              <h3 className="text-[11px] font-black text-zinc-100 uppercase tracking-widest">Simulation Studio</h3>
+              <div className={`w-1.5 h-1.5 rounded-full ${simState === 'playing' ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-zinc-700'}`}></div>
+              <h3 className="text-[11px] font-black text-zinc-100 uppercase tracking-widest">Simulation Feed</h3>
             </div>
             <span className="text-[9px] text-zinc-600 font-mono tracking-tighter mt-1 block">
               {lastMsg?.sourceId ? `BUS ALPHA | SRC: ${lastMsg.sourceId}` : 'BUS STANDBY'}
             </span>
           </div>
           <div className="flex gap-1.5">
-            {!isSimulating ? (
+            {simState !== 'playing' ? (
               <Button size="sm" onClick={handleStart} variant="primary" className="h-8 text-[9px] px-4 font-black flex items-center gap-2 group shadow-lg shadow-blue-900/20">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="group-hover:scale-110 transition-transform"><path d="m7 4 12 8-12 8V4z"/></svg>
                 PLAY SIM
@@ -78,7 +79,6 @@ export const LiveMonitor: React.FC = () => {
           </div>
         </div>
 
-        {/* Presets Grid */}
         <div className="grid grid-cols-2 gap-2">
           {presets.map(p => (
             <button
@@ -94,14 +94,13 @@ export const LiveMonitor: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
-        {/* Active State Section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Active State</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Live Registry</span>
               <div className="h-0.5 w-12 bg-zinc-800"></div>
             </div>
-            <span className="text-[9px] text-zinc-600 font-mono font-bold">TICKS {tick}</span>
+            <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase">Distributing Signals</span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
@@ -127,7 +126,7 @@ export const LiveMonitor: React.FC = () => {
                     {record && (
                       <div className="flex items-center justify-end gap-1 mt-0.5 animate-in fade-in slide-in-from-top-1">
                         <div className="w-1 h-1 rounded-full bg-blue-500/40"></div>
-                        <span className="text-[7px] text-zinc-700 font-bold uppercase tracking-widest">SYNCED</span>
+                        <span className="text-[7px] text-zinc-700 font-bold uppercase tracking-widest">OUTBOUND</span>
                       </div>
                     )}
                   </div>
@@ -137,16 +136,15 @@ export const LiveMonitor: React.FC = () => {
           </div>
         </section>
 
-        {/* Event Stream Section */}
         <section className="space-y-4">
           <div className="flex items-center justify-between px-1">
              <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Recent Events</span>
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Event Log</span>
               <div className="h-0.5 w-12 bg-zinc-800"></div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20 border border-blue-500/40 animate-pulse"></div>
-              <span className="text-[9px] text-zinc-600 font-mono font-bold">LOGGING</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${busState === 'streaming' ? 'bg-green-500 animate-pulse' : 'bg-zinc-800'}`}></div>
+              <span className="text-[9px] text-zinc-600 font-mono font-bold uppercase">Monitoring</span>
             </div>
           </div>
 
@@ -172,7 +170,7 @@ export const LiveMonitor: React.FC = () => {
                   <div className="flex items-center gap-2 text-[8px] text-zinc-700 font-bold uppercase">
                     <span>SEQ: {ev.seq}</span>
                     <span className="w-0.5 h-0.5 bg-zinc-800 rounded-full"></span>
-                    <span>TICK MS: {ev.ts % 1000}</span>
+                    <span>TS: {ev.ts % 1000}</span>
                   </div>
                 </div>
                 <div className="text-right flex flex-col items-end gap-1">
@@ -185,11 +183,8 @@ export const LiveMonitor: React.FC = () => {
             ))}
             {events.length === 0 && (
               <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-zinc-800/50 rounded-2xl bg-black/20">
-                <div className="w-10 h-10 bg-zinc-800/30 rounded-full flex items-center justify-center mb-3">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700"><path d="M12 2v4"/><path d="m16.2 4.2 2.8 2.8"/><path d="M18 12h4"/><path d="m16.2 19.8 2.8-2.8"/><path d="M12 18v4"/><path d="m4.2 19.8 2.8-2.8"/><path d="M2 12h4"/><path d="m4.2 4.2 2.8 2.8"/></svg>
-                </div>
-                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest leading-relaxed text-center px-4">
-                  Simulation idle.<br/>Apply a preset to begin.
+                <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest leading-relaxed text-center px-4 opacity-40">
+                  Awaiting traffic on Alpha Bus
                 </p>
               </div>
             )}
@@ -197,22 +192,19 @@ export const LiveMonitor: React.FC = () => {
         </section>
       </div>
 
-      {/* Footer Info */}
       <div className="p-3 bg-zinc-950/90 border-t border-zinc-800 flex items-center justify-between sticky bottom-0 z-20">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isSimulating ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)] animate-pulse' : 'bg-zinc-800'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${busState === 'streaming' ? 'bg-green-500' : 'bg-zinc-800'}`}></div>
           <span className="text-[9px] text-zinc-600 font-bold uppercase tracking-[0.15em]">
-            SIM STATUS: {isSimulating ? 'STREAMING' : 'READY'}
+            BUS: {busState.toUpperCase()}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => liveBus.runSelfTest()} 
-            className="text-[9px] font-black text-zinc-500 hover:text-blue-400 transition-colors uppercase tracking-widest border border-zinc-800 px-2 py-0.5 rounded"
-          >
-            Run Diagnostics
-          </button>
-        </div>
+        <button 
+          onClick={() => liveBus.runSelfTest()} 
+          className="text-[9px] font-black text-zinc-500 hover:text-blue-400 transition-colors uppercase tracking-widest border border-zinc-800 px-2 py-0.5 rounded"
+        >
+          Diagnostics
+        </button>
       </div>
     </div>
   );

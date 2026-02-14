@@ -29,6 +29,8 @@ const ADAPTERS: DataAdapter[] = [
 
 export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
+export type SimState = 'stopped' | 'playing';
+export type BusState = 'idle' | 'streaming' | 'error';
 
 interface ImportResult {
   importedCount: number;
@@ -41,6 +43,10 @@ interface DataState {
   availableAdapters: DataAdapter[];
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
+  
+  // Pipeline State
+  simState: SimState;
+  busState: BusState;
   
   // Dictionaries
   builtinDictionaries: Dictionary[];
@@ -70,6 +76,8 @@ interface DataState {
 
   // Actions
   setOrgId: (id: string) => void;
+  setSimState: (state: SimState) => void;
+  setBusState: (state: BusState) => void;
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   validateGraph: () => void;
@@ -87,6 +95,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   availableAdapters: ADAPTERS,
   activeAdapterId: ADAPTERS[0].id,
   liveSnapshot: {},
+  
+  simState: 'stopped',
+  busState: 'idle',
   
   builtinDictionaries: [MLB_CANON_DICTIONARY as unknown as Dictionary],
   importedDictionaries: [],
@@ -106,10 +117,13 @@ export const useDataStore = create<DataState>((set, get) => ({
     endpointUrl: null,
   },
 
+  setSimState: (simState) => set({ simState }),
+  setBusState: (busState) => set({ busState }),
+
   onNodesChange: (changes: NodeChange[]) => {
     set({ 
       nodes: applyNodeChanges(changes, get().nodes),
-      validation: { ...get().validation, status: 'idle' } // Reset validation on change
+      validation: { ...get().validation, status: 'idle' } 
     });
     get().saveToOrg();
   },
@@ -138,7 +152,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   validateGraph: () => {
     set({ validation: { ...get().validation, status: 'validating', errors: [] } });
     
-    // Simulate thinking/scanning
     setTimeout(() => {
       const { nodes, edges } = get();
       const errors: string[] = [];
@@ -146,7 +159,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       if (nodes.length === 0) {
         errors.push("Graph is empty. Add nodes to define logic.");
       } else {
-        // 1. Check for orphaned nodes (no connections)
         nodes.forEach(node => {
           const hasConnection = edges.some(edge => edge.source === node.id || edge.target === node.id);
           if (!hasConnection) {
@@ -174,7 +186,6 @@ export const useDataStore = create<DataState>((set, get) => ({
 
     set({ deployment: { status: 'deploying', endpointUrl: null } });
 
-    // Simulate cluster provisioning
     setTimeout(() => {
       const mockUrl = `https://api.renderless.io/v1/edge/${get().orgId}/live.json`;
       set({ 
@@ -238,10 +249,11 @@ export const useDataStore = create<DataState>((set, get) => ({
     let skippedCount = 0;
     const conflicts: string[] = [];
 
-    // Import Dictionaries
+    // FIX: Properly initialize local variables for modified state to fix "Cannot find name" errors.
     const nextDicts = [...currentDicts];
+    const nextMaps = [...currentMaps];
+
     dictionaries.forEach(dict => {
-      // Skip builtin
       if (get().builtinDictionaries.some(bd => bd.dictionaryId === dict.dictionaryId)) {
         skippedCount++;
         conflicts.push(`Dictionary [Built-in]: ${dict.dictionaryId}`);
@@ -258,8 +270,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       }
     });
 
-    // Import Mappings
-    const nextMaps = [...currentMaps];
     mappings.forEach(map => {
       const existingIdx = nextMaps.findIndex(m => m.mappingId === map.mappingId);
       if (existingIdx === -1) {
@@ -288,9 +298,15 @@ export const useDataStore = create<DataState>((set, get) => ({
 liveBus.subscribeAll((msg) => {
   const store = useDataStore.getState();
   const { nodes, edges } = store;
+
+  // Monitor Bus health automatically
+  if (msg.type) {
+    store.setBusState('streaming');
+    // Auto-idle if no traffic for 10s (simplified)
+  }
+
   if (!nodes.length) return;
 
-  // Extract changed keys
   let changedKeys: string[] = [];
   if (msg.type === 'snapshot') {
     changedKeys = Object.keys(msg.values);
@@ -308,7 +324,6 @@ liveBus.subscribeAll((msg) => {
     const record = liveBus.getValue(keyId);
     if (!record) return;
 
-    // Find nodes associated with this key
     updatedNodes.forEach((node, idx) => {
       if (node.data.keyId === keyId) {
         hasChanges = true;
@@ -321,7 +336,6 @@ liveBus.subscribeAll((msg) => {
           }
         };
 
-        // Trigger edge animations for outgoing connections
         updatedEdges.forEach((edge, eIdx) => {
           if (edge.source === node.id) {
             updatedEdges[eIdx] = { ...edge, animated: true };
@@ -334,7 +348,6 @@ liveBus.subscribeAll((msg) => {
   if (hasChanges) {
     useDataStore.setState({ nodes: updatedNodes, edges: updatedEdges });
     
-    // Throttled reset of edge animations to keep things clean but responsive
     setTimeout(() => {
       const currentNodes = useDataStore.getState().nodes;
       const currentEdges = useDataStore.getState().edges;
@@ -344,7 +357,6 @@ liveBus.subscribeAll((msg) => {
   }
 });
 
-// Initial load
 setTimeout(() => {
   useDataStore.getState().loadFromOrg('org_default');
 }, 0);

@@ -33,7 +33,6 @@ const NodeCanvasInner: React.FC = () => {
 
     const field = JSON.parse(fieldData);
     
-    // Calculate drop position relative to canvas
     const newNode = {
       id: `node-${field.keyId}-${Date.now()}`,
       data: { 
@@ -111,12 +110,8 @@ const NodeCanvasInner: React.FC = () => {
           cursor: grabbing;
         }
         @keyframes react-flow__dashdraw {
-          from {
-            stroke-dashoffset: 10;
-          }
-          to {
-            stroke-dashoffset: 0;
-          }
+          from { stroke-dashoffset: 10; }
+          to { stroke-dashoffset: 0; }
         }
       `}</style>
       
@@ -136,38 +131,42 @@ const NodeCanvasInner: React.FC = () => {
           className="bg-zinc-900 border border-zinc-800"
         />
         
-        <Panel position="top-right" className="flex flex-col gap-3">
-          <div className="flex gap-2 bg-zinc-900/80 backdrop-blur-md p-1.5 rounded-xl border border-zinc-800 shadow-2xl">
-            <Button 
-              size="sm" 
-              variant={validation.status === 'pass' ? 'secondary' : 'primary'} 
-              onClick={validateGraph}
-              disabled={validation.status === 'validating'}
-              className="px-4 py-2 font-black uppercase tracking-widest text-[10px]"
-            >
-              {validation.status === 'validating' ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  Validating...
-                </div>
-              ) : 'Validate Graph'}
-            </Button>
-            <Button 
-              size="sm" 
-              variant="primary" 
-              onClick={deployEndpoint}
-              disabled={validation.status !== 'pass' || deployment.status !== 'idle'}
-              className={`px-6 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${
-                validation.status === 'pass' 
-                  ? 'bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.4)]' 
-                  : 'bg-zinc-800 text-zinc-600'
-              }`}
-            >
-              Deploy Endpoint
-            </Button>
+        <Panel position="top-right" className="flex flex-col gap-3 max-w-[280px]">
+          <div className="flex flex-col gap-2 bg-zinc-900/90 backdrop-blur-md p-3 rounded-2xl border border-zinc-800 shadow-2xl">
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant={validation.status === 'pass' ? 'secondary' : 'primary'} 
+                onClick={validateGraph}
+                disabled={validation.status === 'validating'}
+                className="flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px]"
+              >
+                {validation.status === 'validating' ? 'Checking...' : 'Validate'}
+              </Button>
+              <Button 
+                size="sm" 
+                variant="primary" 
+                onClick={deployEndpoint}
+                disabled={validation.status !== 'pass' || deployment.status !== 'idle'}
+                className={`flex-1 px-4 py-2 font-black uppercase tracking-widest text-[10px] transition-all ${
+                  validation.status === 'pass' ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-zinc-800 text-zinc-600'
+                }`}
+              >
+                Deploy
+              </Button>
+            </div>
+            <div className="space-y-2 mt-1 px-1">
+               <div className="flex flex-col">
+                 <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Validate Graph</span>
+                 <p className="text-[8px] text-zinc-600 font-bold uppercase leading-tight mt-0.5">Checks for missing connections or orphaned logic paths.</p>
+               </div>
+               <div className="flex flex-col">
+                 <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Deploy Endpoint</span>
+                 <p className="text-[8px] text-zinc-600 font-bold uppercase leading-tight mt-0.5">Publishes this logic to a production-ready API.</p>
+               </div>
+            </div>
           </div>
 
-          {/* Validation Report UI */}
           {validation.status !== 'idle' && (
             <div className={`animate-in slide-in-from-top-4 duration-300 p-3 rounded-xl border flex flex-col gap-2 shadow-xl ${
               validation.status === 'pass' ? 'bg-green-500/10 border-green-500/30' : 
@@ -201,7 +200,6 @@ const NodeCanvasInner: React.FC = () => {
         </Panel>
       </ReactFlow>
 
-      {/* Deployment Overlays */}
       {deployment.status !== 'idle' && (
         <div className="absolute inset-0 z-[100] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-500">
           <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-[0_0_100px_rgba(0,0,0,0.5)] p-10 text-center animate-in zoom-in-95 duration-300">
@@ -252,14 +250,8 @@ const NodeCanvasInner: React.FC = () => {
       )}
       
       <style>{`
-        @keyframes progress {
-          0% { width: 0; }
-          100% { width: 100%; }
-        }
-        @keyframes check {
-          0% { transform: scale(0.5); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes progress { 0% { width: 0; } 100% { width: 100%; } }
+        @keyframes check { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
       `}</style>
     </div>
   );

@@ -2,8 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useDataStore } from './store/useDataStore';
 import { resolvePath, normalizeValue } from './engine-logic';
-// Fix: Import Dictionary and DictionaryKey from contract types as they are defined there, not in shared types.
-import { DictionaryItem } from '../../shared/types';
 import { Dictionary, DictionaryKey } from '../../contract/types';
 
 export const DataDictionaryBrowser: React.FC = () => {
@@ -25,7 +23,6 @@ export const DataDictionaryBrowser: React.FC = () => {
 
   const allDictionaries = useMemo(() => [...builtinDictionaries, ...importedDictionaries], [builtinDictionaries, importedDictionaries]);
 
-  // Fix: Explicitly typing the results object ensures that the keys variable in the map function has a defined type (DictionaryKey[]) instead of unknown.
   const groupedKeys = useMemo((): Record<string, DictionaryKey[]> => {
     const results: Record<string, DictionaryKey[]> = {};
     const s = search.toLowerCase();
@@ -44,10 +41,20 @@ export const DataDictionaryBrowser: React.FC = () => {
   }, [allDictionaries, search]);
 
   return (
-    <div className="w-[320px] h-full bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
-      <div className="p-4 border-b border-zinc-800 space-y-4 bg-zinc-900/50">
+    <div className="w-[320px] h-full bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0 relative">
+      {/* Flow Indicator */}
+      <div className="absolute top-3 left-4 z-10 pointer-events-none">
+        <div className="flex items-center gap-2 px-2 py-1 bg-zinc-800/50 border border-zinc-700/50 rounded-md backdrop-blur-md">
+          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">1. Data Sources</span>
+        </div>
+      </div>
+
+      <div className="p-4 pt-12 border-b border-zinc-800 space-y-4 bg-zinc-900/50">
         <div className="flex flex-col gap-1">
-          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Active Provider</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Active Provider</h3>
+            <span className="text-[8px] text-zinc-700 font-mono">STEP 1</span>
+          </div>
           <select 
             value={activeAdapterId}
             onChange={(e) => setActiveAdapter(e.target.value)}
@@ -57,6 +64,7 @@ export const DataDictionaryBrowser: React.FC = () => {
               <option key={adapter.id} value={adapter.id}>{adapter.name}</option>
             ))}
           </select>
+          <p className="text-[8px] text-zinc-600 font-bold uppercase leading-tight mt-1 ml-0.5">Drag keys onto canvas to begin logic.</p>
         </div>
 
         <div className="relative">
@@ -81,7 +89,6 @@ export const DataDictionaryBrowser: React.FC = () => {
             </div>
             
             <div className="space-y-0.5 ml-2">
-              {/* Fix: Casting keys to DictionaryKey[] to resolve "Property 'map' does not exist on type 'unknown'" error at runtime or compile time. */}
               {(keys as DictionaryKey[]).map((key) => {
                 const liveValue = resolvePath(liveSnapshot, key.path);
                 const displayValue = normalizeValue(liveValue, key.dataType);
@@ -112,7 +119,7 @@ export const DataDictionaryBrowser: React.FC = () => {
                       <span className="text-[9px] text-zinc-600 font-mono truncate max-w-[150px]">
                         {key.path}
                       </span>
-                      <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-tighter">Drag to Bind</span>
+                      <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-tighter">Drag to Canvas</span>
                     </div>
                   </div>
                 );
