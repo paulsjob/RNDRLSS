@@ -62,7 +62,10 @@ const PipelineHeader: React.FC = () => {
 };
 
 export const DataEngineView: React.FC = () => {
-  const [monitorWidth, setMonitorWidth] = useState(380);
+  const [monitorWidth, setMonitorWidth] = useState(() => {
+    const saved = localStorage.getItem('renderless:ui:monitor-width');
+    return saved ? parseInt(saved, 10) : 420;
+  });
   const isResizing = useRef(false);
 
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -78,13 +81,14 @@ export const DataEngineView: React.FC = () => {
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', stopResizing);
     document.body.style.cursor = 'default';
-  }, []);
+    localStorage.setItem('renderless:ui:monitor-width', monitorWidth.toString());
+  }, [monitorWidth]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isResizing.current) return;
     const newWidth = window.innerWidth - e.clientX;
     const minWidth = 300;
-    const maxWidth = Math.min(600, window.innerWidth * 0.45);
+    const maxWidth = Math.min(800, window.innerWidth * 0.45);
     if (newWidth >= minWidth && newWidth <= maxWidth) {
       setMonitorWidth(newWidth);
     }
@@ -137,11 +141,12 @@ export const DataEngineView: React.FC = () => {
         {/* Resize Handle */}
         <div 
           onMouseDown={startResizing}
-          className="w-1 bg-zinc-800 hover:bg-blue-500 transition-colors cursor-col-resize z-50 flex-shrink-0 relative"
+          className="w-1.5 bg-zinc-800 hover:bg-blue-600 transition-colors cursor-col-resize z-[60] flex-shrink-0 relative group"
           title="Drag to resize monitor"
         >
-          <div className="absolute top-1/2 -left-1.5 w-4 h-8 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-700 opacity-0 group-hover:opacity-100">
-             <div className="w-0.5 h-3 bg-zinc-600 rounded-full"></div>
+          <div className="absolute top-1/2 -left-1 w-4 h-12 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity">
+             <div className="w-[1px] h-4 bg-zinc-500 mx-[1px]"></div>
+             <div className="w-[1px] h-4 bg-zinc-500 mx-[1px]"></div>
           </div>
         </div>
 

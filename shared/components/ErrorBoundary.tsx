@@ -1,9 +1,9 @@
 
-import * as React from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
-  children?: React.ReactNode;
+  children?: ReactNode;
   featureName?: string;
 }
 
@@ -16,9 +16,9 @@ export interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from React.Component to provide error boundary lifecycle methods.
  */
-// FIX: Using React.Component explicitly to ensure standard properties like 'props' and 'setState' are correctly inherited and recognized by the compiler.
+// FIX: Using explicit React.Component to ensure standard properties like 'props' and 'setState' are correctly inherited and recognized.
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // FIX: Use class property for state initialization to resolve state access errors.
+  // FIX: State initialization via class property for clarity in TypeScript.
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null,
@@ -30,8 +30,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   // Lifecycle method for side-effects when an error is caught
-  public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // FIX: Using this.props correctly through explicit React.Component inheritance.
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // FIX: Correctly accessing featureName from this.props through React.Component inheritance.
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
@@ -40,12 +40,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: Using this.setState correctly through explicit React.Component inheritance.
+    // FIX: Correctly calling this.setState from the React.Component base class.
     this.setState({ hasError: false, error: null });
   };
 
-  public render() {
-    // FIX: Accessing this.state and this.props through explicit React.Component inheritance.
+  public render(): ReactNode {
+    // FIX: Accessing this.state and this.props which are now properly recognized.
     if (this.state.hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">

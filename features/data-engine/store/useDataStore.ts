@@ -14,7 +14,7 @@ import {
   addEdge 
 } from 'reactflow';
 import { DataAdapter } from '../../../shared/types';
-import { Dictionary, MappingSpec } from '../../../contract/types';
+import { Dictionary, MappingSpec, KeyId } from '../../../contract/types';
 import { SportsAdapter } from '../../../services/data/adapters/SportsAdapter';
 import { FinanceAdapter } from '../../../services/data/adapters/FinanceAdapter';
 import { WeatherAdapter } from '../../../services/data/adapters/WeatherAdapter';
@@ -48,6 +48,10 @@ interface DataState {
   simState: SimState;
   busState: BusState;
   
+  // Wiring Mode (Item 27)
+  isWiringMode: boolean;
+  activeWiringSource: { id: string; type: 'key' | 'node'; label?: string } | null;
+  
   // Dictionaries
   builtinDictionaries: Dictionary[];
   importedDictionaries: Dictionary[];
@@ -78,6 +82,7 @@ interface DataState {
   setOrgId: (id: string) => void;
   setSimState: (state: SimState) => void;
   setBusState: (state: BusState) => void;
+  setWiringMode: (active: boolean, source?: { id: string; type: 'key' | 'node'; label?: string }) => void;
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   validateGraph: () => void;
@@ -99,6 +104,10 @@ export const useDataStore = create<DataState>((set, get) => ({
   simState: 'stopped',
   busState: 'idle',
   
+  // Wiring State
+  isWiringMode: false,
+  activeWiringSource: null,
+  
   builtinDictionaries: [MLB_CANON_DICTIONARY as unknown as Dictionary],
   importedDictionaries: [],
   mappings: [],
@@ -119,6 +128,7 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   setSimState: (simState) => set({ simState }),
   setBusState: (busState) => set({ busState }),
+  setWiringMode: (active, source = null) => set({ isWiringMode: active, activeWiringSource: source }),
 
   onNodesChange: (changes: NodeChange[]) => {
     set({ 
@@ -136,7 +146,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
   onConnect: (connection: Connection) => {
     set({ 
-      edges: addEdge({ ...connection, animated: true }, get().edges),
+      edges: addEdge({ ...connection, animated: true, style: { stroke: '#3b82f6', strokeWidth: 3 } }, get().edges),
       validation: { ...get().validation, status: 'idle' }
     });
     get().saveToOrg();
@@ -249,7 +259,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     let skippedCount = 0;
     const conflicts: string[] = [];
 
-    // FIX: Properly initialize local variables for modified state to fix "Cannot find name" errors.
     const nextDicts = [...currentDicts];
     const nextMaps = [...currentMaps];
 
@@ -299,10 +308,8 @@ liveBus.subscribeAll((msg) => {
   const store = useDataStore.getState();
   const { nodes, edges } = store;
 
-  // Monitor Bus health automatically
   if (msg.type) {
     store.setBusState('streaming');
-    // Auto-idle if no traffic for 10s (simplified)
   }
 
   if (!nodes.length) return;

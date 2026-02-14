@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -10,6 +10,20 @@ import {
 } from 'reactflow';
 import { Button } from '../../shared/components/Button';
 import { useDataStore } from './store/useDataStore';
+
+const BindingToast: React.FC<{ label: string; onDone: () => void }> = ({ label, onDone }) => {
+  useEffect(() => {
+    const timer = setTimeout(onDone, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-blue-600 text-white px-6 py-3 rounded-full font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_10px_40px_rgba(37,99,235,0.4)] animate-in slide-in-from-bottom-4 duration-300 flex items-center gap-3 border border-blue-400/50">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      Bound to {label}
+    </div>
+  );
+};
 
 const NodeCanvasInner: React.FC = () => {
   const { 
@@ -23,8 +37,12 @@ const NodeCanvasInner: React.FC = () => {
     validateGraph,
     deployment,
     deployEndpoint,
-    resetDeployment
+    resetDeployment,
+    isWiringMode,
+    activeWiringSource
   } = useDataStore();
+
+  const [bindingConfirmation, setBindingConfirmation] = useState<string | null>(null);
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -56,19 +74,21 @@ const NodeCanvasInner: React.FC = () => {
     };
 
     addNode(newNode);
+    setBindingConfirmation(field.alias);
   };
 
   const nodeWithData = nodes.map(node => {
     const isRecentlyUpdated = Date.now() - (node.data.lastUpdated || 0) < 800;
+    const isWiringTarget = isWiringMode && activeWiringSource?.type === 'key';
     
     return {
       ...node,
       data: {
         ...node.data,
         label: (
-          <div className="flex flex-col gap-1.5" title={`Key: ${node.data.keyId}\nValue: ${JSON.stringify(node.data.value)}`}>
+          <div className={`flex flex-col gap-1.5 transition-all ${isWiringTarget ? 'scale-105' : ''}`} title={`Key: ${node.data.keyId}\nValue: ${JSON.stringify(node.data.value)}`}>
             <div className="flex items-center justify-between border-b border-blue-500/20 pb-1 mb-1">
-              <span className="font-black uppercase tracking-widest text-[9px] text-zinc-400">{node.data.label}</span>
+              <span className={`font-black uppercase tracking-widest text-[9px] ${isWiringTarget ? 'text-blue-400' : 'text-zinc-400'}`}>{node.data.label}</span>
               <div className={`w-1.5 h-1.5 rounded-full ${isRecentlyUpdated ? 'bg-blue-400 animate-ping' : 'bg-zinc-800'}`}></div>
             </div>
             <div className="flex flex-col">
@@ -82,15 +102,16 @@ const NodeCanvasInner: React.FC = () => {
       },
       style: {
         ...node.style,
-        borderColor: isRecentlyUpdated ? '#3b82f6' : '#1e293b',
-        boxShadow: isRecentlyUpdated ? '0 0 20px rgba(59, 130, 246, 0.4)' : '0 4px 10px rgba(0,0,0,0.5)',
-        transform: isRecentlyUpdated ? 'scale(1.05)' : 'scale(1)'
+        borderColor: isRecentlyUpdated ? '#3b82f6' : (isWiringTarget ? '#3b82f6aa' : '#1e293b'),
+        boxShadow: isRecentlyUpdated ? '0 0 20px rgba(59, 130, 246, 0.4)' : (isWiringTarget ? '0 0 15px rgba(59, 130, 246, 0.2)' : '0 4px 10px rgba(0,0,0,0.5)'),
+        transform: isRecentlyUpdated ? 'scale(1.05)' : 'scale(1)',
+        animation: isWiringTarget ? 'pulse-wiring 2s infinite' : 'none'
       }
     };
   });
 
   return (
-    <div className="flex-1 h-full bg-zinc-950 relative" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+    <div className={`flex-1 h-full transition-all duration-500 ${isWiringMode ? 'bg-blue-900/5' : 'bg-zinc-950'} relative`} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
       <style>{`
         .react-flow__edge-path {
           stroke: #27272a;
@@ -100,8 +121,8 @@ const NodeCanvasInner: React.FC = () => {
         .react-flow__edge.animated .react-flow__edge-path {
           stroke: #3b82f6;
           stroke-width: 3;
-          stroke-dasharray: 5;
-          animation: react-flow__dashdraw 0.5s linear infinite;
+          stroke-dasharray: 8;
+          animation: react-flow__dashdraw 0.3s linear infinite;
         }
         .react-flow__node {
           cursor: grab;
@@ -110,8 +131,13 @@ const NodeCanvasInner: React.FC = () => {
           cursor: grabbing;
         }
         @keyframes react-flow__dashdraw {
-          from { stroke-dashoffset: 10; }
+          from { stroke-dashoffset: 16; }
           to { stroke-dashoffset: 0; }
+        }
+        @keyframes pulse-wiring {
+          0% { border-color: #1d4ed8; }
+          50% { border-color: #3b82f6; }
+          100% { border-color: #1d4ed8; }
         }
       `}</style>
       
@@ -123,7 +149,7 @@ const NodeCanvasInner: React.FC = () => {
         onConnect={onConnect}
         fitView
       >
-        <Background color="#18181b" gap={20} size={1} />
+        <Background color={isWiringMode ? "#1e40af22" : "#18181b"} gap={20} size={1} />
         <Controls className="bg-zinc-900 border-zinc-800 fill-white" />
         <MiniMap 
           nodeColor={(n) => n.type === 'input' ? '#1e1b4b' : '#09090b'}
@@ -198,7 +224,22 @@ const NodeCanvasInner: React.FC = () => {
             </div>
           )}
         </Panel>
+
+        {isWiringMode && (
+          <Panel position="top-left" className="pointer-events-none">
+            <div className="bg-blue-600/20 border border-blue-500/40 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-3 animate-in fade-in zoom-in duration-200">
+               <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></div>
+               <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
+                 Wiring Active: {activeWiringSource?.label || 'Source'}
+               </span>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
+
+      {bindingConfirmation && (
+        <BindingToast label={bindingConfirmation} onDone={() => setBindingConfirmation(null)} />
+      )}
 
       {deployment.status !== 'idle' && (
         <div className="absolute inset-0 z-[100] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-500">
@@ -248,11 +289,6 @@ const NodeCanvasInner: React.FC = () => {
           </div>
         </div>
       )}
-      
-      <style>{`
-        @keyframes progress { 0% { width: 0; } 100% { width: 100%; } }
-        @keyframes check { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-      `}</style>
     </div>
   );
 };

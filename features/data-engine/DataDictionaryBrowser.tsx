@@ -4,6 +4,22 @@ import { useDataStore } from './store/useDataStore';
 import { resolvePath, normalizeValue } from './engine-logic';
 import { Dictionary, DictionaryKey } from '../../contract/types';
 
+const KeyPreviewTooltip: React.FC<{ value: any; label: string; x: number; y: number }> = ({ value, label, x, y }) => (
+  <div 
+    className="fixed z-[100] bg-zinc-900 border border-blue-500/50 rounded-xl px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.8)] pointer-events-none animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-1 min-w-[140px]"
+    style={{ left: x + 15, top: y - 20 }}
+  >
+    <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">{label}</span>
+    <span className="text-xl font-mono font-black text-white leading-none">
+      {value !== undefined ? (typeof value === 'object' ? '{...}' : String(value)) : '---'}
+    </span>
+    <div className="flex items-center gap-1.5 mt-1 opacity-50">
+       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+       <span className="text-[8px] font-bold text-zinc-400 uppercase">Live Stream Active</span>
+    </div>
+  </div>
+);
+
 export const DataDictionaryBrowser: React.FC = () => {
   const { 
     availableAdapters, 
@@ -12,9 +28,13 @@ export const DataDictionaryBrowser: React.FC = () => {
     liveSnapshot, 
     refreshSnapshot,
     builtinDictionaries,
-    importedDictionaries
+    importedDictionaries,
+    isWiringMode,
+    setWiringMode
   } = useDataStore();
+  
   const [search, setSearch] = useState('');
+  const [hoveredKey, setHoveredKey] = useState<{ key: DictionaryKey; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const interval = setInterval(refreshSnapshot, 5000);
@@ -64,7 +84,7 @@ export const DataDictionaryBrowser: React.FC = () => {
               <option key={adapter.id} value={adapter.id}>{adapter.name}</option>
             ))}
           </select>
-          <p className="text-[8px] text-zinc-600 font-bold uppercase leading-tight mt-1 ml-0.5">Drag keys onto canvas to begin logic.</p>
+          <p className="text-[8px] text-zinc-600 font-bold uppercase leading-tight mt-1 ml-0.5">Drag keys onto canvas to wire logic.</p>
         </div>
 
         <div className="relative">
@@ -99,7 +119,13 @@ export const DataDictionaryBrowser: React.FC = () => {
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData('application/renderless-field', JSON.stringify(key));
+                      setWiringMode(true, { id: key.keyId, type: 'key', label: key.alias });
                     }}
+                    onDragEnd={() => setWiringMode(false)}
+                    onMouseEnter={(e) => {
+                       setHoveredKey({ key, x: e.clientX, y: e.clientY });
+                    }}
+                    onMouseLeave={() => setHoveredKey(null)}
                     className="group relative flex flex-col p-2.5 rounded hover:bg-zinc-800 cursor-grab active:cursor-grabbing transition-all border border-transparent hover:border-zinc-700/50"
                   >
                     <div className="flex justify-between items-start">
@@ -119,7 +145,7 @@ export const DataDictionaryBrowser: React.FC = () => {
                       <span className="text-[9px] text-zinc-600 font-mono truncate max-w-[150px]">
                         {key.path}
                       </span>
-                      <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-tighter">Drag to Canvas</span>
+                      <span className="text-[8px] text-zinc-700 font-bold uppercase tracking-tighter">Plug to Node</span>
                     </div>
                   </div>
                 );
@@ -128,6 +154,15 @@ export const DataDictionaryBrowser: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {hoveredKey && (
+        <KeyPreviewTooltip 
+          label={hoveredKey.key.alias}
+          value={resolvePath(liveSnapshot, hoveredKey.key.path)}
+          x={hoveredKey.x}
+          y={hoveredKey.y}
+        />
+      )}
     </div>
   );
 };
