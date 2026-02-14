@@ -31,6 +31,7 @@ export type ValidationStatus = 'idle' | 'validating' | 'pass' | 'fail';
 export type DeploymentStatus = 'idle' | 'deploying' | 'success';
 export type SimState = 'stopped' | 'playing' | 'paused';
 export type BusState = 'idle' | 'streaming' | 'error';
+export type Provenance = 'LIVE' | 'SIM' | 'MANUAL' | 'STALE' | 'INVALID';
 
 interface ImportResult {
   importedCount: number;
@@ -43,6 +44,10 @@ interface DataState {
   availableAdapters: DataAdapter[];
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
+  
+  // Truth Mode (Item 30)
+  isTruthMode: boolean;
+  selectedTraceId: string | null; // KeyId or NodeId
   
   // Pipeline State
   simState: SimState;
@@ -67,7 +72,7 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
-  // Validation & Deployment (ITEM 29 Enhancements)
+  // Validation & Deployment
   validation: {
     status: ValidationStatus;
     errors: { message: string; nodeId?: string }[];
@@ -85,6 +90,8 @@ interface DataState {
   setSimState: (state: SimState) => void;
   setBusState: (state: BusState) => void;
   setWiringMode: (active: boolean, source?: { id: string; type: 'key' | 'node'; label?: string }) => void;
+  setTruthMode: (active: boolean) => void;
+  setTraceId: (id: string | null) => void;
   setActiveAdapter: (id: string) => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   validateGraph: () => void;
@@ -102,6 +109,10 @@ export const useDataStore = create<DataState>((set, get) => ({
   availableAdapters: ADAPTERS,
   activeAdapterId: ADAPTERS[0].id,
   liveSnapshot: {},
+  
+  // Truth State
+  isTruthMode: false,
+  selectedTraceId: null,
   
   simState: 'stopped',
   busState: 'idle',
@@ -132,8 +143,11 @@ export const useDataStore = create<DataState>((set, get) => ({
   setSimState: (simState) => set({ simState }),
   setBusState: (busState) => set({ busState }),
   setWiringMode: (active, source = null) => set({ isWiringMode: active, activeWiringSource: source }),
+  setTruthMode: (isTruthMode) => set({ isTruthMode, isWiringMode: false, activeWiringSource: null }),
+  setTraceId: (selectedTraceId) => set({ selectedTraceId }),
 
   onNodesChange: (changes: NodeChange[]) => {
+    if (get().isTruthMode) return;
     set({ 
       nodes: applyNodeChanges(changes, get().nodes),
       validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() } 
@@ -141,6 +155,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().saveToOrg();
   },
   onEdgesChange: (changes: EdgeChange[]) => {
+    if (get().isTruthMode) return;
     set({ 
       edges: applyEdgeChanges(changes, get().edges),
       validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() }
@@ -148,6 +163,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().saveToOrg();
   },
   onConnect: (connection: Connection) => {
+    if (get().isTruthMode) return;
     set({ 
       edges: addEdge({ ...connection, animated: true, style: { stroke: '#3b82f6', strokeWidth: 3 } }, get().edges),
       validation: { ...get().validation, status: 'idle' }
@@ -155,6 +171,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     get().saveToOrg();
   },
   addNode: (node: Node) => {
+    if (get().isTruthMode) return;
     set({ 
       nodes: [...get().nodes, node],
       validation: { ...get().validation, status: 'idle' }
@@ -171,23 +188,14 @@ export const useDataStore = create<DataState>((set, get) => ({
       const offendingNodeIds = new Set<string>();
 
       if (nodes.length === 0) {
-        errors.push({ message: "Graph is empty. Add nodes from the dictionary to define logic." });
+        errors.push({ message: "This pipeline is empty. Connect a source to drive the live bus." });
       } else {
         nodes.forEach(node => {
           const hasInbound = edges.some(edge => edge.target === node.id);
           const hasOutbound = edges.some(edge => edge.source === node.id);
           
           if (!hasInbound && !hasOutbound) {
-            errors.push({ message: `Orphaned Node: "${node.data.label}" has no connections.`, nodeId: node.id });
-            offendingNodeIds.add(node.id);
-          } else if (hasInbound && !hasOutbound) {
-            // Check if it's an output node or intermediate
-            // For now, treat non-outbound as a 'dead end' if not intended
-            // (In a real system, some nodes are leaf nodes/outputs)
-          }
-          
-          if (!node.data.keyId) {
-            errors.push({ message: `Integrity Error: Node "${node.id}" lost its KeyId reference.`, nodeId: node.id });
+            errors.push({ message: `This data point exists but never reaches the live bus.`, nodeId: node.id });
             offendingNodeIds.add(node.id);
           }
         });
@@ -208,7 +216,6 @@ export const useDataStore = create<DataState>((set, get) => ({
     const { validation, nodes, edges } = get();
     if (validation.status !== 'pass') return;
 
-    // Generate a manifest preview
     const manifest = {
       timestamp: Date.now(),
       activeKeys: nodes.map(n => n.data.keyId),
@@ -363,7 +370,8 @@ liveBus.subscribeAll((msg) => {
           data: {
             ...node.data,
             value: record.value,
-            lastUpdated: Date.now()
+            lastUpdated: Date.now(),
+            sourceId: record.sourceId
           }
         };
 
@@ -391,3 +399,13 @@ liveBus.subscribeAll((msg) => {
 setTimeout(() => {
   useDataStore.getState().loadFromOrg('org_default');
 }, 0);
+
+// Global Helper for Provenance
+export const getProvenance = (sourceId?: string, ts?: number): Provenance => {
+  if (!sourceId) return 'STALE';
+  if (ts && Date.now() - ts > 15000) return 'STALE';
+  if (sourceId.startsWith('sim_')) return 'SIM';
+  if (sourceId.startsWith('console_')) return 'MANUAL';
+  if (sourceId.includes('v1') || sourceId.includes('hub')) return 'LIVE';
+  return 'LIVE';
+};

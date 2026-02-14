@@ -1,4 +1,5 @@
-import React, { ErrorInfo, ReactNode } from 'react';
+
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
@@ -15,8 +16,8 @@ export interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from Component to provide error boundary lifecycle methods.
  */
-// FIX: Using explicit React.Component and providing generic types to ensure 'props' and 'state' are correctly inherited.
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// FIX: Using explicit Component import and providing generic types to ensure 'props' and 'state' are correctly inherited from the React base class.
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // FIX: Explicitly initializing state within the constructor to ensure it is correctly associated with the React component context.
   constructor(props: ErrorBoundaryProps) {
     super(props);
