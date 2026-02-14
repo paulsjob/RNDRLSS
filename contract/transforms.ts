@@ -2,6 +2,8 @@ export const applyTransforms = (value: any, transforms: string[]): any => {
   let result = value;
 
   for (const t of transforms) {
+    if (!t) continue;
+    
     switch (t) {
       case 'upper':
         if (typeof result === 'string') result = result.toUpperCase();
@@ -20,7 +22,7 @@ export const applyTransforms = (value: any, transforms: string[]): any => {
         break;
       default:
         // Handle parameterized transforms like fixed(n)
-        if (t.startsWith('fixed(')) {
+        if (typeof t === 'string' && t.startsWith('fixed(')) {
           // Fixed: Use optional chaining with bracket access instead of .at(0) to ensure compatibility with RegExpMatchArray.
           const n = parseInt(t.match(/\d+/)?.[0] || '0');
           if (typeof result === 'number') result = result.toFixed(n);

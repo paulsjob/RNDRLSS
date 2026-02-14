@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Dictionary, DictionaryKey, KeyKind } from '../../contract/types';
 
@@ -23,13 +22,15 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
   const allKeys = useMemo(() => {
     const keys: (DictionaryKey & { dictId: string; dictName: string; isBuiltin: boolean })[] = [];
     dictionaries.forEach(d => {
-      const isBuiltin = d.dictionaryId.startsWith('canon.');
+      // FIX: Add safe check for dictionaryId
+      const dictId = d.dictionaryId || 'unknown';
+      const isBuiltin = dictId.startsWith('canon.');
       d.keys.forEach(k => {
         if (filterKind && k.kind !== filterKind) return;
         keys.push({ 
           ...k, 
-          dictId: d.dictionaryId, 
-          dictName: d.dictionaryId.split('.').slice(-1)[0].toUpperCase(),
+          dictId: dictId, 
+          dictName: dictId.split('.').slice(-1)[0].toUpperCase(),
           isBuiltin
         });
       });
@@ -40,7 +41,11 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
   const filteredKeys = useMemo(() => {
     const s = search.toLowerCase();
     return allKeys.filter(k => {
-      const matchesSearch = k.alias.toLowerCase().includes(s) || k.path.toLowerCase().includes(s);
+      // FIX: Add safe check for path and alias
+      const matchesSearch = 
+        (k.alias || '').toLowerCase().includes(s) || 
+        (k.path || '').toLowerCase().includes(s) ||
+        (k.canonicalPath || '').toLowerCase().includes(s);
       const matchesDict = selectedDictId === "all" || k.dictId === selectedDictId;
       return matchesSearch && matchesDict;
     });
@@ -73,7 +78,7 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
         >
           <option value="all">All Dictionaries</option>
           {dictionaries.map(d => (
-            <option key={d.dictionaryId} value={d.dictionaryId}>{d.dictionaryId.split('.').slice(-1)[0]}</option>
+            <option key={d.dictionaryId} value={d.dictionaryId}>{d.dictionaryId?.split('.').slice(-1)[0] || 'Unknown'}</option>
           ))}
         </select>
       </div>
@@ -95,7 +100,7 @@ export const KeyPicker: React.FC<KeyPickerProps> = ({
                 </span>
               </div>
               <div className="flex items-center gap-2 mt-1 z-10">
-                <span className="text-[9px] text-zinc-600 font-mono truncate">{k.path}</span>
+                <span className="text-[9px] text-zinc-600 font-mono truncate">{k.canonicalPath || k.path}</span>
                 {k.tags?.slice(0, 1).map(t => (
                   <span key={t} className="text-[7px] text-zinc-700 uppercase font-black">#{t}</span>
                 ))}

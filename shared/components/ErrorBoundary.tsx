@@ -14,10 +14,10 @@ export interface ErrorBoundaryState {
 
 /**
  * Component to catch and handle runtime errors in the UI tree.
- * Inherits from React.Component to provide error boundary lifecycle methods.
+ * Inherits from Component to provide error boundary lifecycle methods.
  */
-// FIX: Using React.Component directly to ensure standard properties like 'props' and 'setState' are correctly inherited and typed.
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// FIX: Extending Component directly to ensure standard properties like 'props' and 'setState' are correctly inherited and typed.
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // FIX: Use class property for state initialization to resolve "Property 'state' does not exist" errors that can occur in some TypeScript environments.
   public state: ErrorBoundaryState = {
     hasError: false,
@@ -31,7 +31,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Lifecycle method for side-effects when an error is caught
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // FIX: 'this.props' is now correctly resolved through explicit React.Component inheritance.
+    // FIX: 'this.props' is now correctly resolved through explicit Component inheritance.
     console.group(`[Renderless Error] ${this.props.featureName || 'Component'}`);
     console.error("Error:", error);
     console.error("Component Stack:", errorInfo.componentStack);
@@ -40,12 +40,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: 'this.setState' is now correctly resolved through explicit React.Component inheritance.
+    // FIX: 'this.setState' is now correctly resolved through explicit Component inheritance.
     this.setState({ hasError: false, error: null });
   };
 
   public render() {
-    // FIX: 'this.state' and 'this.props' are now correctly resolved through explicit React.Component inheritance.
+    // FIX: 'this.state' and 'this.props' are now correctly resolved through explicit Component inheritance.
     if (this.state.hasError) {
       return (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-8 border border-red-900/20 m-2 rounded-2xl shadow-2xl">

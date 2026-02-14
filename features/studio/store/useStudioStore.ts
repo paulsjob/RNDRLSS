@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { 
   GraphicTemplate, 
@@ -367,8 +366,11 @@ liveBus.subscribeAll((msg) => {
   let hasUpdates = false;
 
   Object.entries(template.bindings).forEach(([bindingKey, value]) => {
-    // FIX: Explicitly cast value to string to resolve 'unknown' type error during split() call.
-    const [keyId, transform] = (value as string).split('|');
+    // FIX: Safely extract keyId and transform, defaulting transform to 'none' if not present
+    const parts = (value as string).split('|');
+    const keyId = parts[0];
+    const transform = parts[1] || 'none';
+    
     if (changedValues[keyId] !== undefined) {
       const [layerId, property] = bindingKey.split('.');
       const layer = template.layers.find(l => l.id === layerId);
