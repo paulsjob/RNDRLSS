@@ -12,7 +12,8 @@ export const GoldenPathPanel: React.FC = () => {
     updateRawInput, 
     validateGoldenPath,
     simController,
-    startDemoPipeline,
+    setSimMode,
+    transportStart,
     bindToGraphic,
     selection,
     validation,
@@ -33,9 +34,10 @@ export const GoldenPathPanel: React.FC = () => {
   const handleLaunchDemo = () => {
     setIsDemoBinding(true);
     
-    // 1. Activate Unified Simulation (ITEM 33)
-    startDemoPipeline();
+    // 1. Prepare/Queue Mode and then Start Transport (ITEM 39)
+    setSimMode('demoPipeline');
     setGoldenPathSource('demo');
+    transportStart();
     
     // 2. Programmatically Bind Layers in Studio
     const studio = useStudioStore.getState();

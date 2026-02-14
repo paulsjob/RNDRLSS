@@ -52,7 +52,7 @@ interface DataState {
   activeAdapterId: string;
   liveSnapshot: Record<string, any>;
   
-  // Unified Simulation Controller (ITEM 33)
+  // Unified Simulation Controller (ITEM 33/39)
   simController: {
     status: SimStatus;
     mode: SimMode | null;
@@ -138,10 +138,15 @@ interface DataState {
     } | null;
   };
 
-  // Unified Simulation Actions
+  // Unified Transport Actions (ITEM 39)
+  transportStart: () => void;
+  transportStop: () => void;
+  transportPause: () => void;
+
+  // Setup/Mode Actions (Secondary)
+  setSimMode: (mode: SimMode, scenarioId?: string | null) => void;
   startDemoPipeline: () => void;
   startFeed: () => void;
-  stopFeed: () => void;
   playScenario: (scenarioId: string) => void;
   pause: () => void;
   stopAll: () => void;
@@ -261,6 +266,45 @@ export const useDataStore = create<DataState>((set, get) => ({
     manifest: null,
   },
 
+  // ITEM 39: Transport Logic
+  transportStart: () => {
+    const { simController } = get();
+    // Default to demo if no mode is selected
+    const targetMode = simController.mode || 'demoPipeline';
+    
+    if (simController.status === 'paused') {
+      get().pause(); // Existing pause logic toggles
+      return;
+    }
+
+    if (targetMode === 'demoPipeline') get().startDemoPipeline();
+    else if (targetMode === 'feedOnly') get().startFeed();
+    else if (targetMode === 'scenario' && simController.activeScenarioId) {
+      get().playScenario(simController.activeScenarioId);
+    } else if (targetMode === 'scenario') {
+      // If scenario mode but none selected, default to first scenario
+      get().playScenario('opening_pitch');
+    }
+  },
+
+  transportStop: () => {
+    get().stopAll();
+  },
+
+  transportPause: () => {
+    get().pause();
+  },
+
+  setSimMode: (mode, scenarioId = null) => {
+    set(state => ({
+      simController: {
+        ...state.simController,
+        mode,
+        activeScenarioId: scenarioId
+      }
+    }));
+  },
+
   togglePin: (keyId) => set(state => {
     const next = new Set(state.monitor.pinnedKeyIds);
     if (next.has(keyId)) next.delete(keyId);
@@ -301,7 +345,8 @@ export const useDataStore = create<DataState>((set, get) => ({
       isTruthMode: false,
       selectedTraceId: null,
       demoPipeline: { timer: 900, homeScore: 3, awayScore: 1 },
-      goldenPath: { ...get().goldenPath, isBound: false, error: null }
+      goldenPath: { ...get().goldenPath, isBound: false, error: null },
+      simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null }
     });
   },
 
@@ -365,10 +410,10 @@ export const useDataStore = create<DataState>((set, get) => ({
       demoIntervalId = null;
     }
     mlbSimulator.stop();
-    set({ 
-      simController: { status: 'idle', mode: null, activeScenarioId: null, lastError: null },
+    set(state => ({ 
+      simController: { ...state.simController, status: 'idle' },
       busState: 'idle'
-    });
+    }));
   },
 
   resetToCleanStart: () => {

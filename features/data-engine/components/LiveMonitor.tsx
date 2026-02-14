@@ -115,9 +115,10 @@ const LiveStateRow: React.FC<{ keyInfo: any; record: LiveValueRecord | null; mod
 export const LiveMonitor: React.FC = () => {
   const { 
     simController, 
-    pause, 
-    stopAll, 
-    playScenario, 
+    transportStop,
+    transportPause,
+    setSimMode,
+    transportStart,
     resetToCleanStart,
     busState, 
     isTruthMode, 
@@ -175,7 +176,7 @@ export const LiveMonitor: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none bg-zinc-950">
-      {/* VTR Controller Bar */}
+      {/* VTR Controller Bar - Integrated into Header in ITEM 39, but keeping local indicators */}
       <div className={`p-4 pt-12 border-b sticky top-0 z-20 space-y-4 shadow-xl transition-all duration-500 ${isTruthMode ? 'bg-blue-900/10 border-blue-500/40 backdrop-blur-xl' : 'bg-zinc-900/90 border-zinc-800 backdrop-blur-md'}`}>
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
@@ -192,17 +193,13 @@ export const LiveMonitor: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <div className={`flex bg-black border border-zinc-800 rounded-lg p-1 gap-1 transition-all ${isTruthMode ? 'opacity-30 grayscale pointer-events-none' : ''}`}>
-              <button onClick={pause} className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${isSimRunning ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30' : 'bg-blue-600 text-white'}`}>
-                {isSimRunning ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="m7 4 12 8-12 8V4z"/></svg>
-                )}
+              <button onClick={transportPause} className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${isSimRunning ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30' : 'bg-zinc-800 text-zinc-500'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></svg>
               </button>
               <button onClick={handleStep} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-all">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 8 4 4-4 4"/><path d="M2 12h20"/></svg>
               </button>
-              <button onClick={stopAll} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 text-red-500 hover:bg-red-500/20 transition-all">
+              <button onClick={transportStop} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 text-red-500 hover:bg-red-500/20 transition-all">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect width="12" height="12" x="6" y="6" rx="2"/></svg>
               </button>
             </div>
@@ -301,7 +298,14 @@ export const LiveMonitor: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {MLB_SCENARIOS.map(s => (
-                <button key={s.id} onClick={() => playScenario(s.id)} className={`flex flex-col text-left p-3 border rounded-xl transition-all group ${simController.activeScenarioId === s.id ? 'bg-blue-600/20 border-blue-500' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800 hover:border-blue-500/30'}`}>
+                <button 
+                  key={s.id} 
+                  onClick={() => {
+                    setSimMode('scenario', s.id);
+                    transportStart();
+                  }} 
+                  className={`flex flex-col text-left p-3 border rounded-xl transition-all group ${simController.activeScenarioId === s.id ? 'bg-blue-600/20 border-blue-500' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800 hover:border-blue-500/30'}`}
+                >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm">{s.icon}</span>
                     <span className={`text-[10px] font-black uppercase tracking-tight ${simController.activeScenarioId === s.id ? 'text-blue-400' : 'text-zinc-300'}`}>{s.label}</span>

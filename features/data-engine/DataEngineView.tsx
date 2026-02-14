@@ -9,6 +9,7 @@ import { useDataStore } from './store/useDataStore';
 import { GoldenPathPanel } from './components/GoldenPathPanel';
 import { PipelineVisualizer } from './components/PipelineVisualizer';
 import { Button } from '../../shared/components/Button';
+import { SimulationTransportBar } from './components/SimulationTransportBar';
 
 /**
  * ITEM 34: Golden Demo Coach Overlay
@@ -25,7 +26,7 @@ const GoldenDemoCoach: React.FC = () => {
   }, [simController.status, selection.id, validation.status, deployment.status]);
 
   const steps = [
-    { id: 1, label: 'Initiate Pipeline', desc: 'Click "Run Demo" to start simulation.', completed: currentStep > 1 },
+    { id: 1, label: 'Initiate Pipeline', desc: 'Click the Play button in the header transport.', completed: currentStep > 1 },
     { id: 2, label: 'Audit Source', desc: 'Select a key from the Dictionary list.', completed: currentStep > 2 },
     { id: 3, label: 'Verify Logic', desc: 'Run "Validate" to check path integrity.', completed: currentStep > 3 },
     { id: 4, label: 'Go Live', desc: 'Deploy to Edge to publish the stream.', completed: currentStep > 4 },
@@ -99,15 +100,12 @@ const PipelineHeader: React.FC = () => {
     busState, 
     isTruthMode, 
     setTruthMode, 
-    startDemoPipeline,
+    transportStart,
     nodes,
     selection,
     validation,
     deployment
   } = useDataStore();
-
-  const isSimRunning = simController.status === 'running';
-  const isSimPaused = simController.status === 'paused';
 
   // ITEM 34: Derived step for highlighting
   const currentStep = useMemo(() => {
@@ -119,7 +117,7 @@ const PipelineHeader: React.FC = () => {
   }, [simController.status, selection.id, validation.status, deployment.status]);
 
   return (
-    <div className={`h-12 border-b flex items-center justify-between px-6 shrink-0 z-[70] transition-colors duration-500 ${isTruthMode ? 'bg-zinc-950 border-blue-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
+    <div className={`h-16 border-b flex items-center justify-between px-6 shrink-0 z-[70] transition-colors duration-500 ${isTruthMode ? 'bg-zinc-950 border-blue-900/50' : 'bg-zinc-900 border-zinc-800'}`}>
       <style>{`
         @keyframes subtle-pulse-blue {
           0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
@@ -142,25 +140,10 @@ const PipelineHeader: React.FC = () => {
           </h2>
         </div>
         
-        <div className="h-4 w-px bg-zinc-800"></div>
+        <div className="h-6 w-px bg-zinc-800"></div>
 
-        {!isTruthMode && simController.status === 'idle' && (
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={startDemoPipeline}
-            className="h-7 text-[10px] font-black uppercase tracking-widest border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/10"
-          >
-            Run Demo
-          </Button>
-        )}
-        
-        <div className="flex items-center gap-4">
-           <div className={`w-2 h-2 rounded-full ${isSimRunning ? 'bg-blue-500 animate-pulse' : isSimPaused ? 'bg-amber-500' : 'bg-zinc-700'}`}></div>
-           <span className="text-[10px] text-zinc-400 font-black uppercase tracking-widest">
-             {isSimRunning ? `SIM: ${simController.mode || 'ACTIVE'}` : isSimPaused ? 'SIM: PAUSED' : 'Simulation Standby'}
-           </span>
-        </div>
+        {/* ITEM 39: Unified Transport replaces redundant Run Demo button */}
+        <SimulationTransportBar />
       </div>
 
       <div className="flex items-center gap-6">
