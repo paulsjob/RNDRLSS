@@ -1,5 +1,4 @@
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 
 // FIX: Exporting interfaces to ensure visibility and proper type recognition in usage contexts like App.tsx.
 export interface ErrorBoundaryProps {
@@ -16,8 +15,8 @@ export interface ErrorBoundaryState {
  * Component to catch and handle runtime errors in the UI tree.
  * Inherits from Component to provide error boundary lifecycle methods.
  */
-// FIX: Using explicit Component from 'react' and providing generic types to ensure 'props' and 'state' are correctly inherited.
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// FIX: Using explicit React.Component and providing generic types to ensure 'props' and 'state' are correctly inherited.
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   // FIX: Explicitly initializing state within the constructor to ensure it is correctly associated with the React component context.
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -44,12 +43,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   // Handler to clear error state and attempt a re-render
   private handleReset = () => {
-    // FIX: Correctly calling this.setState from the inherited React.Component base class.
+    // FIX: Correctly calling this.setState from the inherited React.Component base class to avoid instance reference errors.
     this.setState({ hasError: false, error: null });
   };
 
   public render(): ReactNode {
-    // FIX: Accessing state and props which are now properly recognized by the TypeScript compiler.
+    // FIX: Accessing state and props which are now properly recognized by the TypeScript compiler via React.Component inheritance.
     const { hasError, error } = this.state;
     const { featureName, children } = this.props;
 

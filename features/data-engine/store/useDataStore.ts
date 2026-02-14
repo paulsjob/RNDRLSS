@@ -48,7 +48,7 @@ interface DataState {
   simState: SimState;
   busState: BusState;
   
-  // Wiring Mode (Item 27)
+  // Wiring Mode
   isWiringMode: boolean;
   activeWiringSource: { id: string; type: 'key' | 'node'; label?: string } | null;
   
@@ -67,15 +67,17 @@ interface DataState {
   onConnect: OnConnect;
   addNode: (node: Node) => void;
 
-  // Validation & Deployment
+  // Validation & Deployment (ITEM 29 Enhancements)
   validation: {
     status: ValidationStatus;
-    errors: string[];
+    errors: { message: string; nodeId?: string }[];
     lastValidated: number;
+    offendingNodeIds: Set<string>;
   };
   deployment: {
     status: DeploymentStatus;
     endpointUrl: string | null;
+    manifestPreview: any;
   };
 
   // Actions
@@ -104,7 +106,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   simState: 'stopped',
   busState: 'idle',
   
-  // Wiring State
   isWiringMode: false,
   activeWiringSource: null,
   
@@ -120,10 +121,12 @@ export const useDataStore = create<DataState>((set, get) => ({
     status: 'idle',
     errors: [],
     lastValidated: 0,
+    offendingNodeIds: new Set(),
   },
   deployment: {
     status: 'idle',
     endpointUrl: null,
+    manifestPreview: null,
   },
 
   setSimState: (simState) => set({ simState }),
@@ -133,14 +136,14 @@ export const useDataStore = create<DataState>((set, get) => ({
   onNodesChange: (changes: NodeChange[]) => {
     set({ 
       nodes: applyNodeChanges(changes, get().nodes),
-      validation: { ...get().validation, status: 'idle' } 
+      validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() } 
     });
     get().saveToOrg();
   },
   onEdgesChange: (changes: EdgeChange[]) => {
     set({ 
       edges: applyEdgeChanges(changes, get().edges),
-      validation: { ...get().validation, status: 'idle' }
+      validation: { ...get().validation, status: 'idle', offendingNodeIds: new Set() }
     });
     get().saveToOrg();
   },
@@ -160,22 +163,32 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   validateGraph: () => {
-    set({ validation: { ...get().validation, status: 'validating', errors: [] } });
+    set({ validation: { ...get().validation, status: 'validating', errors: [], offendingNodeIds: new Set() } });
     
     setTimeout(() => {
       const { nodes, edges } = get();
-      const errors: string[] = [];
+      const errors: { message: string; nodeId?: string }[] = [];
+      const offendingNodeIds = new Set<string>();
 
       if (nodes.length === 0) {
-        errors.push("Graph is empty. Add nodes to define logic.");
+        errors.push({ message: "Graph is empty. Add nodes from the dictionary to define logic." });
       } else {
         nodes.forEach(node => {
-          const hasConnection = edges.some(edge => edge.source === node.id || edge.target === node.id);
-          if (!hasConnection) {
-            errors.push(`Orphaned Node: "${node.data.label}" has no logic paths.`);
+          const hasInbound = edges.some(edge => edge.target === node.id);
+          const hasOutbound = edges.some(edge => edge.source === node.id);
+          
+          if (!hasInbound && !hasOutbound) {
+            errors.push({ message: `Orphaned Node: "${node.data.label}" has no connections.`, nodeId: node.id });
+            offendingNodeIds.add(node.id);
+          } else if (hasInbound && !hasOutbound) {
+            // Check if it's an output node or intermediate
+            // For now, treat non-outbound as a 'dead end' if not intended
+            // (In a real system, some nodes are leaf nodes/outputs)
           }
+          
           if (!node.data.keyId) {
-            errors.push(`Invalid Node: "${node.id}" is missing a KeyId reference.`);
+            errors.push({ message: `Integrity Error: Node "${node.id}" lost its KeyId reference.`, nodeId: node.id });
+            offendingNodeIds.add(node.id);
           }
         });
       }
@@ -184,31 +197,42 @@ export const useDataStore = create<DataState>((set, get) => ({
         validation: { 
           status: errors.length > 0 ? 'fail' : 'pass', 
           errors,
-          lastValidated: Date.now()
+          lastValidated: Date.now(),
+          offendingNodeIds
         } 
       });
-    }, 1200);
+    }, 1000);
   },
 
   deployEndpoint: () => {
-    const { validation } = get();
+    const { validation, nodes, edges } = get();
     if (validation.status !== 'pass') return;
 
-    set({ deployment: { status: 'deploying', endpointUrl: null } });
+    // Generate a manifest preview
+    const manifest = {
+      timestamp: Date.now(),
+      activeKeys: nodes.map(n => n.data.keyId),
+      logicDepth: edges.length,
+      edgeNodes: ["CLUSTER_ALPHA_AWS_US_EAST"],
+      compression: "BROTLI_V2"
+    };
+
+    set({ deployment: { ...get().deployment, status: 'deploying', manifestPreview: manifest } });
 
     setTimeout(() => {
       const mockUrl = `https://api.renderless.io/v1/edge/${get().orgId}/live.json`;
       set({ 
         deployment: { 
+          ...get().deployment,
           status: 'success', 
           endpointUrl: mockUrl 
         } 
       });
-    }, 2500);
+    }, 2000);
   },
 
   resetDeployment: () => {
-    set({ deployment: { status: 'idle', endpointUrl: null } });
+    set({ deployment: { status: 'idle', endpointUrl: null, manifestPreview: null } });
   },
 
   setOrgId: (id) => {
