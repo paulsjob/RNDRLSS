@@ -6,7 +6,7 @@ import { LogicLayer, LayerType } from '../../shared/types';
 export const PropertyInspector: React.FC = () => {
   // Fix: Access selectedLayerId from selection object in the latest StudioState schema
   const { currentTemplate, selection, updateLayerTransform, updateLayerContent, setBinding, updateTemplateMetadata } = useStudioStore();
-  const selectedLayerId = selection.selectedLayerId;
+  const selectedLayerId = selection.selectedLayerIds[0];
 
   const layer = currentTemplate?.layers.find(l => l.id === selectedLayerId);
 

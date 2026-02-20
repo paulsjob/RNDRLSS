@@ -25,18 +25,20 @@ interface StudioState {
     activeResolution: keyof typeof RESOLUTIONS;
     editingLayerId: string | null; // Track text editing mode
     lastPulseLayerId: string | null; // Track visual pulse on data update
+    alignTo: 'selection' | 'canvas';
   };
   selection: {
-    selectedLayerId: string | null;
+    selectedLayerIds: string[];
   };
   
   // Actions
   setTemplate: (template: GraphicTemplate) => void;
-  selectLayer: (id: string | null) => void;
+  selectLayer: (id: string | null, multi?: boolean, range?: boolean) => void;
   setAspectRatio: (ratio: AspectRatio) => void;
   togglePanel: (panel: 'left' | 'right') => void;
   setZoom: (zoom: number) => void;
   setResolution: (res: keyof typeof RESOLUTIONS) => void;
+  setAlignTo: (alignTo: 'selection' | 'canvas') => void;
   setEditingLayerId: (id: string | null) => void; // Toggle text edit mode
   
   // Template Actions
@@ -46,7 +48,14 @@ interface StudioState {
   addLayer: (type: LayerType) => void;
   addAssetLayer: (asset: Asset) => void;
   removeLayer: (id: string) => void;
+  moveLayer: (id: string, direction: 'up' | 'down') => void;
+  toggleLayerVisibility: (id: string) => void;
+  toggleLayerLock: (id: string) => void;
   setBinding: (layerId: string, property: string, dictionaryItemId: string | null, transform?: string) => void;
+  
+  // Alignment Actions
+  alignLayers: (mode: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom', relativeTo: 'selection' | 'comp') => void;
+  distributeLayers: (direction: 'horizontal' | 'vertical') => void;
 }
 
 const INITIAL_TEMPLATE: GraphicTemplate = {
@@ -159,7 +168,8 @@ const INITIAL_TEMPLATE: GraphicTemplate = {
       { layerId: 'layer-bg', property: 'width', value: 300 },
       { layerId: 'layer-bg', property: 'x', value: 20 }
     ],
-    [AspectRatio.SQUARE]: []
+    [AspectRatio.SQUARE]: [],
+    [AspectRatio.PORTRAIT]: []
   }
 };
 
@@ -172,15 +182,38 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     activeResolution: 'BROADCAST',
     editingLayerId: null,
     lastPulseLayerId: null,
+    alignTo: 'selection',
   },
   selection: {
-    selectedLayerId: null,
+    selectedLayerIds: [],
   },
 
   setTemplate: (template) => set({ currentTemplate: template }),
-  selectLayer: (id) => set((state) => ({ 
-    selection: { ...state.selection, selectedLayerId: id } 
-  })),
+  
+  selectLayer: (id, multi = false, range = false) => set((state) => {
+    if (!id) return { selection: { selectedLayerIds: [] } };
+    
+    let newIds: string[] = [...state.selection.selectedLayerIds];
+    
+    if (range && state.currentTemplate && newIds.length > 0) {
+      const allIds = state.currentTemplate.layers.map(l => l.id);
+      const lastId = newIds[newIds.length - 1];
+      const startIdx = allIds.indexOf(lastId);
+      const endIdx = allIds.indexOf(id);
+      const rangeIds = allIds.slice(Math.min(startIdx, endIdx), Math.max(startIdx, endIdx) + 1);
+      newIds = Array.from(new Set([...newIds, ...rangeIds]));
+    } else if (multi) {
+      if (newIds.includes(id)) {
+        newIds = newIds.filter(i => i !== id);
+      } else {
+        newIds.push(id);
+      }
+    } else {
+      newIds = [id];
+    }
+    
+    return { selection: { selectedLayerIds: newIds } };
+  }),
   
   setAspectRatio: (ratio) => set((state) => {
     const resKey = Object.entries(RESOLUTIONS).find(([_, v]) => v.ratio === ratio)?.[0] as keyof typeof RESOLUTIONS;
@@ -202,6 +235,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   setResolution: (res) => set((state) => ({
     ui: { ...state.ui, activeResolution: res }
+  })),
+
+  setAlignTo: (alignTo) => set((state) => ({
+    ui: { ...state.ui, alignTo }
   })),
 
   setEditingLayerId: (id) => set((state) => ({
@@ -348,7 +385,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         ...state.currentTemplate,
         layers: [...state.currentTemplate.layers, newLayer]
       },
-      selection: { selectedLayerId: id }
+      selection: { selectedLayerIds: [id] }
     };
   }),
 
@@ -361,11 +398,134 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         ...state.ui,
         editingLayerId: isEditing ? null : state.ui.editingLayerId
       },
+      selection: {
+        selectedLayerIds: state.selection.selectedLayerIds.filter(sid => sid !== id)
+      },
       currentTemplate: {
         ...state.currentTemplate,
         layers: state.currentTemplate.layers.filter((l) => l.id !== id)
       }
     };
+  }),
+
+  moveLayer: (id, direction) => set((state) => {
+    if (!state.currentTemplate) return state;
+    const layers = [...state.currentTemplate.layers];
+    const index = layers.findIndex(l => l.id === id);
+    if (index === -1) return state;
+
+    const newIndex = direction === 'up' ? index + 1 : index - 1;
+    if (newIndex < 0 || newIndex >= layers.length) return state;
+
+    const [removed] = layers.splice(index, 1);
+    layers.splice(newIndex, 0, removed);
+
+    return {
+      currentTemplate: { ...state.currentTemplate, layers }
+    };
+  }),
+
+  toggleLayerVisibility: (id) => set((state) => {
+    if (!state.currentTemplate) return state;
+    return {
+      currentTemplate: {
+        ...state.currentTemplate,
+        layers: state.currentTemplate.layers.map(l => 
+          l.id === id ? { ...l, visible: !l.visible } : l
+        ) as Layer[]
+      }
+    };
+  }),
+
+  toggleLayerLock: (id) => set((state) => {
+    if (!state.currentTemplate) return state;
+    return {
+      currentTemplate: {
+        ...state.currentTemplate,
+        layers: state.currentTemplate.layers.map(l => 
+          l.id === id ? { ...l, locked: !l.locked } : l
+        ) as Layer[]
+      }
+    };
+  }),
+
+  alignLayers: (mode, relativeTo) => set((state) => {
+    if (!state.currentTemplate || state.selection.selectedLayerIds.length === 0) return state;
+    
+    const res = RESOLUTIONS[state.ui.activeResolution];
+    const layers = [...state.currentTemplate.layers];
+    const selectedIds = state.selection.selectedLayerIds;
+    const selectedLayers = layers.filter(l => selectedIds.includes(l.id));
+
+    let bounds = {
+      minX: Math.min(...selectedLayers.map(l => l.transform.x)),
+      maxX: Math.max(...selectedLayers.map(l => l.transform.x + l.transform.width)),
+      minY: Math.min(...selectedLayers.map(l => l.transform.y)),
+      maxY: Math.max(...selectedLayers.map(l => l.transform.y + l.transform.height)),
+    };
+
+    if (relativeTo === 'comp') {
+      bounds = { minX: 0, maxX: res.width, minY: 0, maxY: res.height };
+    }
+
+    const updatedLayers = layers.map(l => {
+      if (!selectedIds.includes(l.id)) return l;
+      const t = { ...l.transform };
+      
+      switch (mode) {
+        case 'left': t.x = bounds.minX; break;
+        case 'right': t.x = bounds.maxX - t.width; break;
+        case 'center': t.x = bounds.minX + (bounds.maxX - bounds.minX) / 2 - t.width / 2; break;
+        case 'top': t.y = bounds.minY; break;
+        case 'bottom': t.y = bounds.maxY - t.height; break;
+        case 'middle': t.y = bounds.minY + (bounds.maxY - bounds.minY) / 2 - t.height / 2; break;
+      }
+      return { ...l, transform: t };
+    });
+
+    return { currentTemplate: { ...state.currentTemplate, layers: updatedLayers as Layer[] } };
+  }),
+
+  distributeLayers: (direction) => set((state) => {
+    if (!state.currentTemplate || state.selection.selectedLayerIds.length < 3) return state;
+    
+    const layers = [...state.currentTemplate.layers];
+    const selectedIds = state.selection.selectedLayerIds;
+    const selectedLayers = layers.filter(l => selectedIds.includes(l.id));
+
+    if (direction === 'horizontal') {
+      const sorted = [...selectedLayers].sort((a, b) => a.transform.x - b.transform.x);
+      const minX = sorted[0].transform.x;
+      const maxX = sorted[sorted.length - 1].transform.x + sorted[sorted.length - 1].transform.width;
+      const totalWidth = sorted.reduce((sum, l) => sum + l.transform.width, 0);
+      const gap = (maxX - minX - totalWidth) / (sorted.length - 1);
+      
+      let currentX = minX;
+      const updatedLayers = layers.map(l => {
+        const sIdx = sorted.findIndex(sl => sl.id === l.id);
+        if (sIdx === -1) return l;
+        const updated = { ...l, transform: { ...l.transform, x: currentX } };
+        currentX += l.transform.width + gap;
+        return updated;
+      });
+      return { currentTemplate: { ...state.currentTemplate, layers: updatedLayers as Layer[] } };
+    } else {
+      const sorted = [...selectedLayers].sort((a, b) => a.transform.y - b.transform.y);
+      const minY = sorted[0].transform.y;
+      const maxY = sorted[sorted.length - 1].transform.y + sorted[sorted.length - 1].transform.height;
+      const totalHeight = sorted.reduce((sum, l) => sum + l.transform.height, 0);
+      const gap = (maxY - minY - totalHeight) / (sorted.length - 1);
+      
+      let currentY = minY;
+      const updatedLayers = layers.map(l => {
+        const sIdx = sorted.findIndex(sl => sl.id === l.id);
+        if (sIdx === -1) return l;
+        const updated = { ...l, transform: { ...l.transform, y: currentY } };
+        currentY += l.transform.height + gap;
+        return updated;
+      });
+      return { currentTemplate: { ...state.currentTemplate, layers: updatedLayers as Layer[] } };
+    }
   }),
 
   setBinding: (layerId, property, dictionaryItemId, transform = 'none') => set((state) => {

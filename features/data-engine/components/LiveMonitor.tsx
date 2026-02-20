@@ -275,7 +275,7 @@ export const LiveMonitor: React.FC = () => {
 
                 {!isCollapsed && (
                   <div className="grid grid-cols-1 gap-2 animate-in fade-in duration-300">
-                    {keys.map(key => (
+                    {(keys as any[]).map(key => (
                       <LiveStateRow 
                         key={key.keyId} 
                         keyInfo={key} 

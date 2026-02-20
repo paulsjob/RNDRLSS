@@ -618,8 +618,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   setBusState: (busState) => set({ busState }),
-  setWiringMode: (active, source = null) => set({ isWiringMode: active, activeWiringSource: source }),
-  setTruthMode: (active) => set({ isTruthMode: active, isWiringMode: false, activeWiringSource: null }),
+  setWiringMode: (active, source = undefined) => set({ isWiringMode: active, activeWiringSource: source }),
+  setTruthMode: (active) => set({ isTruthMode: active, isWiringMode: false, activeWiringSource: undefined }),
   setTraceId: (selectedTraceId) => set({ selectedTraceId }),
 
   onNodesChange: (changes: NodeChange[]) => {

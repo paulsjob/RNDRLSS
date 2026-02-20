@@ -2,14 +2,15 @@
 export enum AspectRatio {
   WIDE = '16:9',
   VERTICAL = '9:16',
-  SQUARE = '1:1'
+  SQUARE = '1:1',
+  PORTRAIT = '4:5'
 }
 
 export const RESOLUTIONS = {
   BROADCAST: { width: 1920, height: 1080, ratio: AspectRatio.WIDE },
   SOCIAL_SQUARE: { width: 1080, height: 1080, ratio: AspectRatio.SQUARE },
   SOCIAL_VERTICAL: { width: 1080, height: 1920, ratio: AspectRatio.VERTICAL },
-  SOCIAL_LEGACY: { width: 1000, height: 1000, ratio: AspectRatio.SQUARE },
+  SOCIAL_PORTRAIT: { width: 1080, height: 1350, ratio: AspectRatio.PORTRAIT },
 } as const;
 
 export enum LayerType {

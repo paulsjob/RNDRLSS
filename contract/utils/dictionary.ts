@@ -11,7 +11,7 @@ export function validateDictionary(input: any): DictionaryRoot {
   if (!result.success) {
     throw new Error(`[Contract] Dictionary Validation Failed: ${result.error.message}`);
   }
-  return result.data;
+  return result.data as DictionaryRoot;
 }
 
 export interface FlatKey extends Omit<DictionaryKey, 'type'> {

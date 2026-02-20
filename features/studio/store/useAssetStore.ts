@@ -41,6 +41,7 @@ interface AssetStore {
   updateAssetPermissions: (id: string, visibility: 'private' | 'team' | 'public', permissions: AssetPermission[]) => void;
   renameAsset: (id: string, newName: string) => void;
   deleteAsset: (id: string) => void;
+  uploadAsset: (file: File) => void;
 }
 
 const MOCK_ASSETS: Asset[] = [
@@ -150,5 +151,23 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
   deleteAsset: (id) => set(state => ({
     assets: state.assets.filter(a => a.id !== id),
     deletingAssetId: null
-  }))
+  })),
+
+  uploadAsset: (file) => {
+    const { assets, currentFolderId } = get();
+    const url = URL.createObjectURL(file);
+    const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    
+    const newAsset: Asset = {
+      id: `asset-${Date.now()}`,
+      name: file.name,
+      type: type as any,
+      parentId: currentFolderId,
+      url,
+      visibility: 'private',
+      permissions: []
+    };
+
+    set({ assets: [...assets, newAsset] });
+  }
 }));

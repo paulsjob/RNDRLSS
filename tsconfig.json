@@ -1,12 +1,27 @@
-
 {
   "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
       "@contract/*": ["contract/*"],
       "@studio/*": ["features/studio/*"],
       "@data-engine/*": ["features/data-engine/*"],
       "@shared/*": ["shared/*"]
-    }
-  }
+    },
+    "types": ["node", "react", "react-dom"]
+  },
+  "include": ["src", "contract", "features", "shared", "**/*.ts", "**/*.tsx"]
 }

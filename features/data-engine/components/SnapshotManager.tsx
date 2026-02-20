@@ -85,9 +85,9 @@ export const SnapshotManager: React.FC = () => {
         }
 
         const result = importBundleData({
-          dictionaries: bundle.dictionaries,
-          mappings: bundle.mappings,
-          graphs: bundle.graphs
+          dictionaries: (bundle.dictionaries as any) || [],
+          mappings: bundle.mappings || [],
+          graphs: bundle.graphs || []
         });
 
         setReport({

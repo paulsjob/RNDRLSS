@@ -37,7 +37,7 @@ export const TextLayerRenderer: React.FC<TextLayerRendererProps> = ({ layer, sca
   const bindings = currentTemplate?.bindings || {};
   
   const isEditing = ui.editingLayerId === layer.id;
-  const isSelected = selection.selectedLayerId === layer.id;
+  const isSelected = selection.selectedLayerIds.includes(layer.id);
   const [localText, setLocalText] = useState(layer.content.text || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

@@ -13,7 +13,7 @@ const ProvenanceBadge: React.FC<{ origin: Provenance }> = ({ origin }) => {
     INVALID: 'bg-red-500/10 text-red-500 border-red-500/20',
   };
   return (
-    <span className={`text-[7px] font-black px-1 py-0.5 rounded border uppercase tracking-tighter ml-2 ${colors[origin]}`}>
+    <span className={`text-[7px] font-black px-1 py-0.5 rounded border uppercase tracking-tighter ml-2 ${(colors as any)[origin]}`}>
       {origin}
     </span>
   );
@@ -80,7 +80,7 @@ export const DataDictionaryBrowser: React.FC = () => {
 
     allDictionaries.forEach((dict: Dictionary) => {
       dict.keys.forEach((key: DictionaryKey) => {
-        if (key.alias.toLowerCase().includes(s) || key.path.toLowerCase().includes(s)) {
+        if (key.alias.toLowerCase().includes(s) || (key.path || '').toLowerCase().includes(s)) {
           const category = `${dict.dictionaryId.split('.').slice(-1)[0]} > ${key.scope}`;
           if (!results[category]) results[category] = [];
           results[category].push(key);
@@ -137,7 +137,7 @@ export const DataDictionaryBrowser: React.FC = () => {
             
             <div className="space-y-0.5 ml-2">
               {(keys as DictionaryKey[]).map((key) => {
-                const liveValue = resolvePath(liveSnapshot, key.path);
+                const liveValue = resolvePath(liveSnapshot, key.path || '');
                 const displayValue = normalizeValue(liveValue, key.dataType);
                 const isSelected = selection.id === key.keyId;
 
@@ -192,7 +192,7 @@ export const DataDictionaryBrowser: React.FC = () => {
       {hoveredKey && isTruthMode && (
         <KeyPreviewTooltip 
           label={hoveredKey.key.alias}
-          value={resolvePath(liveSnapshot, hoveredKey.key.path)}
+          value={resolvePath(liveSnapshot, hoveredKey.key.path || '')}
           origin={getProvenance(activeAdapterId)}
           x={hoveredKey.x}
           y={hoveredKey.y}

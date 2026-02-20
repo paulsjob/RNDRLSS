@@ -91,7 +91,7 @@ export const InspectorSidebar: React.FC = () => {
   const [isBindingModalOpen, setIsBindingModalOpen] = useState(false);
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
 
-  const selectedLayerId = selection.selectedLayerId;
+  const selectedLayerId = selection.selectedLayerIds[0];
   const layer = currentTemplate?.layers.find(l => l.id === selectedLayerId);
 
   if (!currentTemplate) return null;
